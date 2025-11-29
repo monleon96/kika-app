@@ -231,7 +231,7 @@ fn main() {
                         }
                     }
                     Err(_) => {}
-                }
+                };
             }
         })
         .run(tauri::generate_context!())
@@ -257,7 +257,7 @@ async fn start_sidecar_backends(app: &tauri::AppHandle) -> Result<(), String> {
             Err(e) => {
                 log::warn!("Failed to lock auth state: {}", e);
             }
-        }
+        };
     }
 
     // Wait for auth to be ready
@@ -277,7 +277,7 @@ async fn start_sidecar_backends(app: &tauri::AppHandle) -> Result<(), String> {
             Err(e) => {
                 log::warn!("Failed to lock core state: {}", e);
             }
-        }
+        };
     }
 
     Ok(())

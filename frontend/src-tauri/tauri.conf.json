@@ -104,7 +104,7 @@
       },
       "resources": [],
       "shortDescription": "Nuclear Data Visualization Tool",
-      "targets": ["msi", "nsis"],
+      "targets": ["nsis", "appimage"],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
