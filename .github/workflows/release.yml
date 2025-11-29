@@ -61,6 +61,7 @@ jobs:
         run: npm run tauri build
 
       - name: List build artifacts (debug)
+        shell: bash
         run: |
           echo "=== NSIS bundle contents ==="
           ls -la frontend/src-tauri/target/release/bundle/nsis/ || echo "No nsis folder"
