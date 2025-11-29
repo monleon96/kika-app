@@ -4,4 +4,5 @@ python-multipart>=0.0.6
 pydantic>=2.5.0
 matplotlib>=3.8.0
 numpy>=1.26.0
+kika-nd
 pyinstaller
