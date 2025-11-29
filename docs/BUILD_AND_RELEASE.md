@@ -157,33 +157,78 @@ Edit `frontend/src-tauri/tauri.conf.json`:
 
 ## Creating a Release
 
-### Automatic (Recommended)
+### Step-by-Step Release Process
 
-1. Update version in `frontend/src-tauri/tauri.conf.json`:
-   ```json
-   {
-     "package": {
-       "version": "0.2.0"
-     }
-   }
-   ```
+**1. Make sure all changes are on develop and tested:**
+```bash
+git checkout develop
+git pull origin develop
+```
 
-2. Commit and push the changes
+**2. Update the version number** in `frontend/src-tauri/tauri.conf.json`:
+```json
+{
+  "package": {
+    "version": "0.2.0"  // Change this
+  }
+}
+```
 
-3. Create a git tag:
-   ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
-   ```
+**3. Also update** `frontend/package.json`:
+```json
+{
+  "version": "0.2.0"  // Match the version
+}
+```
 
-4. GitHub Actions will automatically:
-   - Build Windows and Linux versions
-   - Create a draft release
-   - Generate the `latest.json` manifest
+**4. Commit the version bump:**
+```bash
+git add -A
+git commit -m "chore: bump version to 0.2.0"
+git push origin develop
+```
 
-5. Go to GitHub Releases, edit the draft, add release notes, and publish
+**5. Merge to main:**
+```bash
+git checkout main
+git pull origin main
+git merge develop
+git push origin main
+```
 
-### Manual Release
+**6. Create and push a tag (THIS triggers the automated build):**
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+**7. Watch the build:**
+- Go to: `https://github.com/monleon96/kika-app/actions`
+- Click on the running workflow to see progress
+- Build takes ~10-15 minutes
+
+**8. Publish the release:**
+- Go to: `https://github.com/monleon96/kika-app/releases`
+- Find the draft release created by the workflow
+- Edit it, add release notes describing what's new
+- Click "Publish release"
+
+**9. Go back to develop for future work:**
+```bash
+git checkout develop
+```
+
+### What Happens Automatically
+
+When you push a tag like `v0.2.0`:
+1. GitHub Actions starts building on Windows and Linux
+2. PyInstaller bundles the Python backends into `.exe` files
+3. Tauri builds the complete app with the backends included
+4. Everything gets signed with your private key
+5. A draft release is created with all the installers
+6. `latest.json` is generated for auto-updates
+
+### Manual Release (if GitHub Actions fails)
 
 1. Build for your platform (see above)
 
