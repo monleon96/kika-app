@@ -4,8 +4,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, text, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, text, func, Uuid, JSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -17,7 +16,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -42,7 +41,7 @@ class Event(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[Optional[str]] = mapped_column(
         String(320),
@@ -53,6 +52,6 @@ class Event(Base):
     ts: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    props: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    props: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     user: Mapped[Optional[User]] = relationship(back_populates="events")

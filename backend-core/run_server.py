@@ -23,9 +23,31 @@ matplotlib.use('Agg')
 
 import uvicorn
 from app.main import app
+from pathlib import Path
+
+def setup_logging():
+    if sys.platform == "win32":
+        app_data = Path(os.environ.get("APPDATA", os.path.expanduser("~"))) / "kika"
+    else:
+        app_data = Path(os.path.expanduser("~/.local/share/kika"))
+    
+    app_data.mkdir(parents=True, exist_ok=True)
+    log_file = app_data / "backend-core.log"
+    
+    # Redirect stdout/stderr to log file
+    sys.stdout = open(log_file, "a", buffering=1)
+    sys.stderr = open(log_file, "a", buffering=1)
+    print(f"Logging to {log_file}")
 
 def main():
     """Run the core processing server."""
+    # Setup logging if frozen
+    if getattr(sys, 'frozen', False):
+        try:
+            setup_logging()
+        except Exception as e:
+            pass # Fallback to console if logging setup fails
+
     port = int(os.environ.get("KIKA_CORE_PORT", "8001"))
     host = os.environ.get("KIKA_CORE_HOST", "127.0.0.1")
     
