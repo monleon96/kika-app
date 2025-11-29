@@ -26,3 +26,7 @@ src-tauri/gen/
 # KIKA specific
 *.ace
 *.endf
+
+# Tauri signing keys (NEVER commit the private key)
+tauri-update-key
+tauri-signing-key
