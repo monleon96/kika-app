@@ -121,9 +121,10 @@ export async function checkAuthHealth(): Promise<boolean> {
     }
   }
 
-  // Browser mode - direct fetch
+  // Browser mode - check the Render server (or localhost for dev)
+  const authUrl = import.meta.env.VITE_BACKEND_URL || 'https://kika-backend.onrender.com';
   try {
-    const response = await fetch('http://localhost:8000/healthz');
+    const response = await fetch(`${authUrl}/healthz`);
     return response.ok;
   } catch {
     return false;

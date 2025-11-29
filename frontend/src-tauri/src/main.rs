@@ -8,43 +8,16 @@ use tauri::{Manager, State};
 
 // Store backend process handles
 struct BackendProcesses {
-    auth: Mutex<Option<CommandChild>>,
     core: Mutex<Option<CommandChild>>,
-}
-
-// Backend URL configuration
-fn get_auth_backend_url() -> String {
-    env::var("KIKA_AUTH_URL").unwrap_or_else(|_| "http://127.0.0.1:8000".to_string())
 }
 
 fn get_core_backend_url() -> String {
     env::var("KIKA_CORE_URL").unwrap_or_else(|_| "http://127.0.0.1:8001".to_string())
 }
 
-// Start the auth backend sidecar
-#[tauri::command]
-async fn start_auth_backend(state: State<'_, BackendProcesses>) -> Result<String, String> {
-    let mut auth_guard = state.auth.lock().map_err(|e| e.to_string())?;
-    
-    if auth_guard.is_some() {
-        return Ok("Auth backend already running".to_string());
-    }
-    
-    // Try to start sidecar (for bundled app)
-    let result = Command::new_sidecar("kika-backend-auth")
-        .map_err(|e| format!("Failed to create sidecar command: {}", e))?
-        .spawn();
-    
-    match result {
-        Ok((mut _rx, child)) => {
-            *auth_guard = Some(child);
-            Ok("Auth backend started".to_string())
-        }
-        Err(e) => {
-            // In development, the backend might be started manually
-            Err(format!("Failed to start auth backend: {}. In development mode, start it manually.", e))
-        }
-    }
+fn get_auth_backend_url() -> String {
+    // Always use the cloud-hosted auth backend on Render
+    env::var("KIKA_AUTH_URL").unwrap_or_else(|_| "https://kika-backend.onrender.com".to_string())
 }
 
 // Start the core backend sidecar
@@ -75,12 +48,8 @@ async fn start_core_backend(state: State<'_, BackendProcesses>) -> Result<String
 // Stop backend processes
 #[tauri::command]
 async fn stop_backends(state: State<'_, BackendProcesses>) -> Result<String, String> {
-    let mut auth_guard = state.auth.lock().map_err(|e| e.to_string())?;
     let mut core_guard = state.core.lock().map_err(|e| e.to_string())?;
     
-    if let Some(child) = auth_guard.take() {
-        let _ = child.kill();
-    }
     if let Some(child) = core_guard.take() {
         let _ = child.kill();
     }
@@ -88,18 +57,7 @@ async fn stop_backends(state: State<'_, BackendProcesses>) -> Result<String, Str
     Ok("Backends stopped".to_string())
 }
 
-// Check if auth backend is healthy
-#[tauri::command]
-async fn check_auth_health() -> Result<bool, String> {
-    let url = format!("{}/healthz", get_auth_backend_url());
-    
-    match reqwest::get(&url).await {
-        Ok(response) => Ok(response.status().is_success()),
-        Err(_) => Ok(false),
-    }
-}
-
-// Check if core backend is healthy
+// Check if core backend is healthy (local sidecar)
 #[tauri::command]
 async fn check_core_health() -> Result<bool, String> {
     let url = format!("{}/healthz", get_core_backend_url());
@@ -110,10 +68,27 @@ async fn check_core_health() -> Result<bool, String> {
     }
 }
 
-// Legacy: check backend health (auth)
+// Check if auth backend is healthy (cloud-hosted on Render)
+#[tauri::command]
+async fn check_auth_health() -> Result<bool, String> {
+    let url = format!("{}/healthz", get_auth_backend_url());
+    
+    match reqwest::get(&url).await {
+        Ok(response) => Ok(response.status().is_success()),
+        Err(_) => Ok(false),
+    }
+}
+
+// Legacy: check backend health - maps to auth health
 #[tauri::command]
 async fn check_backend_health() -> Result<bool, String> {
     check_auth_health().await
+}
+
+// Legacy: start auth backend - no-op since auth is cloud-hosted
+#[tauri::command]
+async fn start_auth_backend(_state: State<'_, BackendProcesses>) -> Result<String, String> {
+    Ok("Auth backend is cloud-hosted at Render".to_string())
 }
 
 // Call Python API endpoint
@@ -171,7 +146,6 @@ fn main() {
     
     tauri::Builder::default()
         .manage(BackendProcesses {
-            auth: Mutex::new(None),
             core: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
@@ -213,16 +187,6 @@ fn main() {
             if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
                 let state: State<BackendProcesses> = event.window().state();
 
-                // Kill auth backend - use match to ensure proper drop order
-                match state.auth.lock() {
-                    Ok(mut auth) => {
-                        if let Some(child) = auth.take() {
-                            let _ = child.kill();
-                        }
-                    }
-                    Err(_) => {}
-                }
-
                 // Kill core backend
                 match state.core.lock() {
                     Ok(mut core) => {
@@ -241,29 +205,8 @@ fn main() {
 #[cfg(not(debug_assertions))]
 async fn start_sidecar_backends(app: &tauri::AppHandle) -> Result<(), String> {
     use tauri::api::process::Command;
-    use std::time::Duration;
 
-    // Start auth backend
-    let auth_result = Command::new_sidecar("kika-backend-auth")
-        .map_err(|e| e.to_string())?
-        .spawn();
-
-    if let Ok((_, child)) = auth_result {
-        let state: State<BackendProcesses> = app.state();
-        match state.auth.lock() {
-            Ok(mut auth) => {
-                *auth = Some(child);
-            }
-            Err(e) => {
-                log::warn!("Failed to lock auth state: {}", e);
-            }
-        };
-    }
-
-    // Wait for auth to be ready
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    // Start core backend
+    // Start core backend only - auth is cloud-hosted on Render
     let core_result = Command::new_sidecar("kika-backend-core")
         .map_err(|e| e.to_string())?
         .spawn();

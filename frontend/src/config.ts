@@ -5,12 +5,16 @@
 // Check if running in Tauri
 const isTauri = '__TAURI__' in window;
 
-// Backend API URL
-// Use environment variable or default to production backend
-// If running in Tauri, default to localhost:8000 (local sidecar)
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (isTauri ? 'http://localhost:8000' : 'https://kika-backend.onrender.com');
+// Determine if we're in development mode
+const isDev = import.meta.env.DEV;
 
-// KIKA Processing Server URL (local Python server)
+// Backend API URL (Auth server - cloud hosted on Render)
+// In dev mode with VITE_BACKEND_URL set, use that (for local testing)
+// Otherwise, always use the Render cloud backend
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://kika-backend.onrender.com';
+
+// KIKA Processing Server URL (local Python server for data processing)
+// This is ALWAYS local, whether in Tauri (sidecar) or Dev (local process)
 export const KIKA_SERVER_URL = import.meta.env.VITE_KIKA_SERVER_URL || 'http://localhost:8001';
 
 // API endpoints

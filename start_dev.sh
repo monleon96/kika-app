@@ -22,14 +22,21 @@ source venv/bin/activate
 echo "Starting services..."
 echo ""
 
-# Start Backend Auth (port 8000)
-echo "[1/3] Starting Auth Backend on http://localhost:8000"
-cd backend-auth
-uvicorn app:app --host 127.0.0.1 --port 8000 --reload &
-AUTH_PID=$!
-cd ..
+# Option to run local auth backend for testing
+LOCAL_AUTH="${LOCAL_AUTH:-false}"
+AUTH_PID=""
 
-sleep 2
+if [ "$LOCAL_AUTH" = "true" ]; then
+    echo "[1/3] Starting LOCAL Auth Backend on http://localhost:8000"
+    cd backend-auth
+    uvicorn app:app --host 127.0.0.1 --port 8000 --reload &
+    AUTH_PID=$!
+    cd ..
+    sleep 2
+    export VITE_BACKEND_URL="http://localhost:8000"
+else
+    echo "[1/3] Using CLOUD Auth Backend (https://kika-backend.onrender.com)"
+fi
 
 # Start Backend Core (port 8001)
 echo "[2/3] Starting Core Backend on http://localhost:8001"
@@ -52,13 +59,24 @@ echo "========================================"
 echo "All services started!"
 echo ""
 echo "  Frontend:     http://localhost:1420"
-echo "  Auth API:     http://localhost:8000/docs"
+if [ "$LOCAL_AUTH" = "true" ]; then
+    echo "  Auth API:     http://localhost:8000/docs (LOCAL)"
+else
+    echo "  Auth API:     https://kika-backend.onrender.com (CLOUD)"
+fi
 echo "  Core API:     http://localhost:8001/docs"
 echo ""
+echo "To use local auth backend: LOCAL_AUTH=true ./start_dev.sh"
 echo "Press Ctrl+C to stop all services"
 echo "========================================"
 
 # Wait for Ctrl+C
-trap "echo 'Stopping...'; kill $AUTH_PID $CORE_PID $FRONTEND_PID 2>/dev/null; exit 0" SIGINT SIGTERM
+cleanup() {
+    echo 'Stopping...'
+    [ -n "$AUTH_PID" ] && kill $AUTH_PID 2>/dev/null
+    kill $CORE_PID $FRONTEND_PID 2>/dev/null
+    exit 0
+}
+trap cleanup SIGINT SIGTERM
 
 wait

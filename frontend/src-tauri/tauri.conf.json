@@ -40,10 +40,6 @@
         "execute": false,
         "scope": [
           {
-            "name": "kika-backend-auth",
-            "sidecar": true
-          },
-          {
             "name": "kika-backend-core",
             "sidecar": true
           }
@@ -72,7 +68,7 @@
       "http": {
         "all": true,
         "request": true,
-        "scope": ["http://localhost:8000/**", "http://localhost:8001/**", "http://127.0.0.1:8000/**", "http://127.0.0.1:8001/**"]
+        "scope": ["http://localhost:8000/**", "http://localhost:8001/**", "http://127.0.0.1:8000/**", "http://127.0.0.1:8001/**", "https://kika-backend.onrender.com/**"]
       }
     },
     "bundle": {
@@ -83,7 +79,6 @@
         "depends": []
       },
       "externalBin": [
-        "binaries/kika-backend-auth",
         "binaries/kika-backend-core"
       ],
       "icon": [

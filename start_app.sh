@@ -18,14 +18,10 @@ echo "Starting KIKA App..."
 # Activate virtual environment
 source venv/bin/activate
 
-# Start Authentication Backend
-echo "Starting Authentication Backend (Port 8000)..."
-cd backend-auth
-uvicorn app:app --reload --port 8000 &
-AUTH_PID=$!
-cd ..
+# Note: Authentication is now cloud-hosted on Render (https://kika-backend.onrender.com)
+# No need to start a local auth backend
 
-# Start Core Backend
+# Start Core Backend (local processing server)
 echo "Starting Core Backend (Port 8001)..."
 cd backend-core
 uvicorn app.main:app --reload --port 8001 &
@@ -39,7 +35,11 @@ npm run tauri dev &
 FRONTEND_PID=$!
 cd ..
 
-echo "All services started. Press Ctrl+C to stop."
+echo "All services started."
+echo "- Core Backend: http://localhost:8001"
+echo "- Auth Backend: https://kika-backend.onrender.com (cloud)"
+echo ""
+echo "Press Ctrl+C to stop."
 
 # Wait for all processes
-wait $AUTH_PID $CORE_PID $FRONTEND_PID
+wait $CORE_PID $FRONTEND_PID

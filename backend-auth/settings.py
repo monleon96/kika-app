@@ -11,7 +11,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     public_base_url: str = "https://kika-backend.onrender.com"
-    cors_allow_origins: list[str] = ["http://localhost:8501"]
+    cors_allow_origins: list[str] = [
+        "http://localhost:8501",
+        "http://localhost:1420",
+        "tauri://localhost",
+        "https://tauri.localhost"
+    ]
 
     # Email configuration - Brevo API (replaces SMTP)
     brevo_api_key: Optional[str] = None

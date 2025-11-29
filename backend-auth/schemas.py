@@ -48,6 +48,13 @@ class AdminCreateUserRequest(BaseModel):
     is_active: bool = True
 
 
+class UserSettingsSchema(BaseModel):
+    data: Dict[str, Any]
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AdminDeactivateUserRequest(BaseModel):
     email: EmailStr
 

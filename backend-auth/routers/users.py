@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import get_session
-from models import User
+from models import User, UserSettings
 from schemas import (
     AdminCreateUserRequest,
     AdminDeactivateUserRequest,
@@ -15,6 +15,7 @@ from schemas import (
     AdminUser,
     OkResponse,
     UserStatusResponse,
+    UserSettingsSchema,
 )
 from security import hash_password
 from settings import get_settings
@@ -45,6 +46,50 @@ async def get_user_status(email: str, session: AsyncSession = Depends(get_sessio
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return UserStatusResponse(email=user.email, verified=bool(user.verified_at), is_active=user.is_active)
+
+
+@router.get("/users/{email}/settings", response_model=UserSettingsSchema)
+async def get_user_settings(email: str, session: AsyncSession = Depends(get_session)) -> UserSettingsSchema:
+    email_normalized = email.lower()
+    result = await session.execute(select(User).where(User.email == email_normalized))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Load settings
+    result = await session.execute(select(UserSettings).where(UserSettings.user_id == user.id))
+    settings = result.scalar_one_or_none()
+    
+    if not settings:
+        return UserSettingsSchema(data={})
+    
+    return UserSettingsSchema(data=settings.data, updated_at=settings.updated_at)
+
+
+@router.post("/users/{email}/settings", response_model=OkResponse)
+async def update_user_settings(
+    email: str, 
+    payload: UserSettingsSchema, 
+    session: AsyncSession = Depends(get_session)
+) -> OkResponse:
+    email_normalized = email.lower()
+    result = await session.execute(select(User).where(User.email == email_normalized))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Check if settings exist
+    result = await session.execute(select(UserSettings).where(UserSettings.user_id == user.id))
+    settings = result.scalar_one_or_none()
+    
+    if settings:
+        settings.data = payload.data
+    else:
+        settings = UserSettings(user_id=user.id, data=payload.data)
+        session.add(settings)
+    
+    await session.commit()
+    return OkResponse()
 
 
 @router.post("/admin/users/create", response_model=AdminUser)

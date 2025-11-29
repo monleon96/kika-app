@@ -39,17 +39,14 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend-auth/requirements.txt
           pip install -r backend-core/requirements.txt
           # Install kika if available or skip
           # pip install kika
 
       - name: Build Python backends
         run: |
-          pyinstaller backend-auth.spec --clean --noconfirm
           pyinstaller backend-core.spec --clean --noconfirm
           mkdir -p frontend/src-tauri/binaries
-          copy dist\kika-backend-auth.exe frontend\src-tauri\binaries\kika-backend-auth-x86_64-pc-windows-msvc.exe
           copy dist\kika-backend-core.exe frontend\src-tauri\binaries\kika-backend-core-x86_64-pc-windows-msvc.exe
 
       - name: Install frontend dependencies
@@ -98,15 +95,12 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend-auth/requirements.txt
           pip install -r backend-core/requirements.txt
 
       - name: Build Python backends
         run: |
-          pyinstaller backend-auth.spec --clean --noconfirm
           pyinstaller backend-core.spec --clean --noconfirm
           mkdir -p frontend/src-tauri/binaries
-          cp dist/kika-backend-auth frontend/src-tauri/binaries/kika-backend-auth-x86_64-unknown-linux-gnu
           cp dist/kika-backend-core frontend/src-tauri/binaries/kika-backend-core-x86_64-unknown-linux-gnu
           chmod +x frontend/src-tauri/binaries/*
 
