@@ -111,8 +111,15 @@ async def login(payload: LoginRequest, request: Request, session: AsyncSession =
     result = await session.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
-    if not user or not user.is_active or not user.verified_at:
+    if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    # In desktop mode (local DB), we skip email verification check if verified_at is null
+    # This allows users to login immediately after registration
+    import sys
+    is_desktop = getattr(sys, 'frozen', False)
+    if not is_desktop and not user.verified_at:
+         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not verified")
 
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
