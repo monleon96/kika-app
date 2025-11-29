@@ -1,6 +1,6 @@
 [package]
 name = "kika"
-version = "0.1.1"
+version = "0.1.2"
 description = "KIKA - Nuclear Data Viewer Desktop Application"
 authors = ["Juan Antonio Monleon <juanmonleon96@gmail.com>"]
 license = "GPL-3.0"

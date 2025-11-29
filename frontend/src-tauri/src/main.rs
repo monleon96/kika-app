@@ -141,6 +141,25 @@ fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+// Get sidecar status for debugging
+#[tauri::command]
+async fn get_sidecar_status(state: State<'_, BackendProcesses>) -> Result<String, String> {
+    let core_guard = state.core.lock().map_err(|e| e.to_string())?;
+    let core_running = core_guard.is_some();
+    
+    let health_url = format!("{}/healthz", get_core_backend_url());
+    let health_ok = match reqwest::get(&health_url).await {
+        Ok(response) => response.status().is_success(),
+        Err(_) => false,
+    };
+    
+    Ok(format!(
+        "Core sidecar process: {}, Health check: {}",
+        if core_running { "running" } else { "not running" },
+        if health_ok { "ok" } else { "failed" }
+    ))
+}
+
 fn main() {
     env_logger::init();
     
@@ -158,6 +177,7 @@ fn main() {
             start_core_backend,
             stop_backends,
             get_app_version,
+            get_sidecar_status,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]
@@ -206,21 +226,50 @@ fn main() {
 async fn start_sidecar_backends(app: &tauri::AppHandle) -> Result<(), String> {
     use tauri::api::process::Command;
 
+    log::info!("Attempting to start core backend sidecar...");
+    
     // Start core backend only - auth is cloud-hosted on Render
     let core_result = Command::new_sidecar("kika-backend-core")
-        .map_err(|e| e.to_string())?
+        .map_err(|e| {
+            log::error!("Failed to create sidecar command: {}", e);
+            e.to_string()
+        })?
         .spawn();
 
-    if let Ok((_, child)) = core_result {
-        let state: State<BackendProcesses> = app.state();
-        match state.core.lock() {
-            Ok(mut core) => {
-                *core = Some(child);
-            }
-            Err(e) => {
-                log::warn!("Failed to lock core state: {}", e);
-            }
-        };
+    match core_result {
+        Ok((_, child)) => {
+            log::info!("Core backend sidecar started successfully");
+            let state: State<BackendProcesses> = app.state();
+            match state.core.lock() {
+                Ok(mut core) => {
+                    *core = Some(child);
+                }
+                Err(e) => {
+                    log::warn!("Failed to lock core state: {}", e);
+                }
+            };
+        }
+        Err(e) => {
+            log::error!("Failed to spawn core backend sidecar: {}", e);
+            return Err(format!("Failed to start core backend: {}", e));
+        }
+    }
+
+    // Give the backend a moment to start
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    
+    // Check if it's actually running
+    let health_url = format!("{}/healthz", get_core_backend_url());
+    match reqwest::get(&health_url).await {
+        Ok(response) if response.status().is_success() => {
+            log::info!("Core backend is healthy and responding");
+        }
+        Ok(response) => {
+            log::warn!("Core backend returned non-success status: {}", response.status());
+        }
+        Err(e) => {
+            log::warn!("Core backend health check failed: {}", e);
+        }
     }
 
     Ok(())

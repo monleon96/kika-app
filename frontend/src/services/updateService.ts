@@ -3,6 +3,8 @@
  * Handles auto-updates and backend process management
  */
 
+import { BACKEND_URL, KIKA_SERVER_URL } from '../config';
+
 // Check if running in Tauri
 const isTauri = '__TAURI__' in window;
 
@@ -10,6 +12,100 @@ interface UpdateManifest {
   version: string;
   notes: string;
   pub_date: string;
+}
+
+export interface DiagnosticInfo {
+  appVersion: string;
+  isTauri: boolean;
+  authBackendUrl: string;
+  authBackendStatus: 'online' | 'offline' | 'error';
+  authBackendError?: string;
+  coreBackendUrl: string;
+  coreBackendStatus: 'online' | 'offline' | 'error';
+  coreBackendError?: string;
+  coreBackendVersion?: string;
+  sidecarStatus?: string;
+}
+
+/**
+ * Get sidecar status from Tauri
+ */
+export async function getSidecarStatus(): Promise<string> {
+  if (!isTauri) {
+    return 'Not running in Tauri';
+  }
+  
+  try {
+    const { invoke } = await import('@tauri-apps/api/tauri');
+    return await invoke<string>('get_sidecar_status');
+  } catch (e) {
+    return `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
+  }
+}
+
+/**
+ * Get comprehensive diagnostic info for debugging
+ */
+export async function getDiagnosticInfo(): Promise<DiagnosticInfo> {
+  const appVersion = await getAppVersion();
+  const sidecarStatus = await getSidecarStatus();
+  
+  let authStatus: 'online' | 'offline' | 'error' = 'offline';
+  let authError: string | undefined;
+  let coreStatus: 'online' | 'offline' | 'error' = 'offline';
+  let coreError: string | undefined;
+  let coreVersion: string | undefined;
+  
+  // Check auth backend
+  try {
+    const authResponse = await fetch(`${BACKEND_URL}/healthz`, { 
+      method: 'GET',
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    });
+    authStatus = authResponse.ok ? 'online' : 'error';
+    if (!authResponse.ok) {
+      authError = `HTTP ${authResponse.status}`;
+    }
+  } catch (e) {
+    authStatus = 'error';
+    authError = e instanceof Error ? e.message : 'Unknown error';
+  }
+  
+  // Check core backend
+  try {
+    const coreResponse = await fetch(`${KIKA_SERVER_URL}/healthz`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    });
+    if (coreResponse.ok) {
+      coreStatus = 'online';
+      try {
+        const data = await coreResponse.json();
+        coreVersion = data.version || 'unknown';
+      } catch {
+        coreVersion = 'unknown';
+      }
+    } else {
+      coreStatus = 'error';
+      coreError = `HTTP ${coreResponse.status}`;
+    }
+  } catch (e) {
+    coreStatus = 'error';
+    coreError = e instanceof Error ? e.message : 'Unknown error';
+  }
+  
+  return {
+    appVersion,
+    isTauri,
+    authBackendUrl: BACKEND_URL,
+    authBackendStatus: authStatus,
+    authBackendError: authError,
+    coreBackendUrl: KIKA_SERVER_URL,
+    coreBackendStatus: coreStatus,
+    coreBackendError: coreError,
+    coreBackendVersion: coreVersion,
+    sidecarStatus,
+  };
 }
 
 /**

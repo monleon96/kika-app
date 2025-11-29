@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Box, AppBar, Toolbar, Typography, IconButton, Button, Badge } from '@mui/material';
-import { Logout, Home as HomeIcon, Folder, FolderOpen } from '@mui/icons-material';
+import { Logout, Home as HomeIcon, Folder, FolderOpen, Info } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
 import { FileWorkspace } from './FileWorkspace';
+import { AboutDialog } from './AboutDialog';
 
 const WORKSPACE_WIDTH = 400;
 
@@ -14,6 +15,7 @@ export const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   const fileCount = files.filter(f => f.status === 'ready').length;
 
@@ -69,6 +71,13 @@ export const Layout: React.FC = () => {
           <Typography variant="body2" sx={{ mr: 2 }}>
             {user?.is_guest ? '🚀 Guest' : user?.email}
           </Typography>
+          <IconButton
+            color="inherit"
+            onClick={() => setAboutOpen(true)}
+            title="About KIKA"
+          >
+            <Info />
+          </IconButton>
           <IconButton 
             color="inherit" 
             onClick={logout} 
@@ -78,6 +87,8 @@ export const Layout: React.FC = () => {
           </IconButton>
         </Toolbar>
       </AppBar>
+      
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       
       <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden', pt: 8 }}>
         <Box

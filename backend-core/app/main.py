@@ -9,7 +9,9 @@ from .models import ACEParseRequest, FileTypeDetectionResponse
 from .services.detection_service import detect_file_type
 from .routers import ace, endf, plot
 
-app = FastAPI(title="KIKA Processing Server", version="1.0.0")
+__version__ = "1.0.1"
+
+app = FastAPI(title="KIKA Processing Server", version=__version__)
 
 # CORS middleware for local development
 app.add_middleware(
@@ -17,7 +19,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:1420",  # Vite dev server
         "http://localhost:5173",  # Alternative Vite port
+        "http://127.0.0.1:1420",  # Alternative localhost
         "tauri://localhost",      # Tauri app
+        "https://tauri.localhost", # Tauri app (HTTPS)
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -32,14 +36,14 @@ app.include_router(plot.router)
 async def root():
     return {
         "name": "KIKA Processing Server",
-        "version": "1.0.0",
+        "version": __version__,
         "status": "running"
     }
 
 @app.get("/healthz")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    return {"status": "healthy", "version": __version__}
 
 @app.post("/api/detect-file-type", response_model=FileTypeDetectionResponse)
 async def detect_file_type_endpoint(request: ACEParseRequest):
