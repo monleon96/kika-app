@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node/Frontend
+node_modules/
+dist/
+.DS_Store
+coverage/
+
+# Rust/Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# IDEs
+.vscode/
+*.code-workspace
+.idea/
+
+# KIKA specific
+*.ace
+*.endf
