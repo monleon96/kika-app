@@ -37,7 +37,7 @@ uvicorn app:app --reload --port 8000
 ### 2. Start Core Backend
 ```bash
 cd backend-core
-uvicorn app:app --reload --port 8001
+uvicorn app.main:app --reload --port 8001
 ```
 
 ### 3. Start Frontend

@@ -61,7 +61,7 @@ export const Home: React.FC = () => {
               <Alert severity="warning">
                 ⚠️ KIKA Server is not responding. Make sure the server is running:
                 <Box component="code" sx={{ display: 'block', mt: 1, p: 1, bgcolor: 'rgba(0,0,0,0.1)', borderRadius: 1, fontSize: '0.85em' }}>
-                  cd KIKA && ./start-dev.sh
+                  ./start_app.sh
                 </Box>
               </Alert>
             )}
@@ -144,9 +144,6 @@ export const Home: React.FC = () => {
             <li>Works offline</li>
             <li>Auto-updates support</li>
           </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-            The Streamlit version is still available in the repository on branch feature/streamlit-ui
-          </Typography>
         </Box>
       </Box>
     </Box>

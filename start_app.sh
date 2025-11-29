@@ -28,7 +28,7 @@ cd ..
 # Start Core Backend
 echo "Starting Core Backend (Port 8001)..."
 cd backend-core
-uvicorn app:app --reload --port 8001 &
+uvicorn app.main:app --reload --port 8001 &
 CORE_PID=$!
 cd ..
 

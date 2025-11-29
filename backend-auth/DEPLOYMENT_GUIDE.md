@@ -5,7 +5,7 @@
 - **Render** → Hosting del backend (kika-backend)
 - **Brevo** → Envío de emails (API)
 - **Neon** → Base de datos PostgreSQL
-- **Streamlit Cloud** (o Render) → Frontend (streamlit_app)
+- **Tauri** → Frontend (Desktop App)
 
 ---
 
@@ -217,8 +217,8 @@ ADMIN_API_KEY=[tu clave local]
 - Comprueba los logs en Brevo → Statistics → Emails
 
 ### Error de CORS
-- Añade tu URL de Streamlit a `CORS_ALLOW_ORIGINS`
-- Formato: `["https://app1.com","https://app2.com"]`
+- Añade tu URL de frontend a `CORS_ALLOW_ORIGINS`
+- Formato: `["http://localhost:1420","tauri://localhost"]`
 
 ### Base de datos no conecta
 - Verifica que la URL tiene `?sslmode=require`
@@ -236,6 +236,6 @@ ADMIN_API_KEY=[tu clave local]
 
 Tu aplicación KIKA debería estar funcionando en:
 - Backend: `https://kika-backend.onrender.com`
-- Frontend: `https://tu-app.streamlit.app`
+- Frontend: Desktop App
 - Emails vía Brevo API
 - Base de datos en Neon PostgreSQL

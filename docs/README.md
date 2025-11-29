@@ -7,9 +7,9 @@ Modern desktop application for visualizing and analyzing nuclear data, built wit
 ```
 ┌─────────────────────────────────────┐
 │  Desktop App (Tauri + React)        │
-│  - Native window                     │
-│  - Local file handling               │
-│  - TypeScript UI                     │
+│  - Native window                    │
+│  - Local file handling              │
+│  - TypeScript UI                    │
 └───────────┬─────────────────────────┘
             │ IPC Commands
     ┌───────▼──────────┐
@@ -21,7 +21,7 @@ Modern desktop application for visualizing and analyzing nuclear data, built wit
             │ HTTP
     ┌───────▼──────────┐
     │  FastAPI Local   │  (Python)
-    │  - KIKA core    │
+    │  - KIKA core     │
     │  - ACE/ENDF      │
     │  - Plotting      │
     └──────────────────┘
@@ -249,7 +249,7 @@ npm run tauri dev
 
 ## 🤝 Contributing
 
-This is a migration from the Streamlit UI. See the original implementation at `../streamlit_app/`.
+This is a new implementation replacing the previous UI.
 
 ## 📝 License
 
