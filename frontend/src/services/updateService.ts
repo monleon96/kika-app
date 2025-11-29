@@ -56,26 +56,38 @@ export async function getDiagnosticInfo(): Promise<DiagnosticInfo> {
   let coreError: string | undefined;
   let coreVersion: string | undefined;
   
-  // Check auth backend
+  // Check auth backend using Tauri HTTP client to bypass CORS
   try {
-    const authResponse = await fetch(`${BACKEND_URL}/healthz`, { 
-      method: 'GET',
-      signal: AbortSignal.timeout(10000) // 10 second timeout
-    });
-    authStatus = authResponse.ok ? 'online' : 'error';
-    if (!authResponse.ok) {
-      authError = `HTTP ${authResponse.status}`;
+    if (isTauri) {
+      const { fetch: tauriFetch } = await import('@tauri-apps/api/http');
+      const authResponse = await tauriFetch(`${BACKEND_URL}/healthz`, {
+        method: 'GET',
+        timeout: 10
+      });
+      authStatus = authResponse.ok ? 'online' : 'error';
+      if (!authResponse.ok) {
+        authError = `HTTP ${authResponse.status}`;
+      }
+    } else {
+      const authResponse = await fetch(`${BACKEND_URL}/healthz`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(10000)
+      });
+      authStatus = authResponse.ok ? 'online' : 'error';
+      if (!authResponse.ok) {
+        authError = `HTTP ${authResponse.status}`;
+      }
     }
   } catch (e) {
     authStatus = 'error';
     authError = e instanceof Error ? e.message : 'Unknown error';
   }
   
-  // Check core backend
+  // Check core backend (local sidecar - no CORS issues)
   try {
     const coreResponse = await fetch(`${KIKA_SERVER_URL}/healthz`, {
       method: 'GET',
-      signal: AbortSignal.timeout(5000) // 5 second timeout
+      signal: AbortSignal.timeout(5000)
     });
     if (coreResponse.ok) {
       coreStatus = 'online';

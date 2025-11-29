@@ -1,6 +1,42 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { BACKEND_URL } from '../config';
 
+// Check if running in Tauri
+const isTauri = '__TAURI__' in window;
+
+// Helper to make HTTP requests that work in both Tauri and browser
+async function authFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const url = `${BACKEND_URL}${endpoint}`;
+  
+  if (isTauri) {
+    try {
+      // Use Tauri's HTTP client which bypasses CORS
+      const { fetch: tauriFetch } = await import('@tauri-apps/api/http');
+      const response = await tauriFetch(url, {
+        method: (options.method || 'GET') as any,
+        headers: options.headers as Record<string, string>,
+        body: options.body ? {
+          type: 'Text',
+          payload: options.body as string,
+        } : undefined,
+      });
+      
+      // Convert Tauri response to standard Response-like object
+      return {
+        ok: response.ok,
+        status: response.status,
+        json: async () => response.data,
+        text: async () => JSON.stringify(response.data),
+      } as Response;
+    } catch (e) {
+      console.error('Tauri fetch failed, falling back to browser fetch:', e);
+      // Fall back to regular fetch
+    }
+  }
+  
+  return fetch(url, options);
+}
+
 export interface User {
   email: string;
   verified: boolean;
@@ -74,19 +110,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         endfConfigs: localStorage.getItem('kikaEndfViewerConfigs'),
       };
 
-      await fetch(`${BACKEND_URL}/users/${user.email}/settings`, {
+      await authFetch(`/users/${user.email}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: localSettings }),
       });
 
       // 2. Pull latest settings (in case another device updated them)
-      const response = await fetch(`${BACKEND_URL}/users/${user.email}/settings`);
+      const response = await authFetch(`/users/${user.email}/settings`);
       if (response.ok) {
-        const { data } = await response.json();
-        if (data && typeof data === 'object') {
-          if (data.aceConfigs) localStorage.setItem('kikaAcePlotterConfigs', data.aceConfigs);
-          if (data.endfConfigs) localStorage.setItem('kikaEndfViewerConfigs', data.endfConfigs);
+        const data = await response.json();
+        if (data?.data && typeof data.data === 'object') {
+          if (data.data.aceConfigs) localStorage.setItem('kikaAcePlotterConfigs', data.data.aceConfigs);
+          if (data.data.endfConfigs) localStorage.setItem('kikaEndfViewerConfigs', data.data.endfConfigs);
         }
       }
     } catch (error) {
@@ -118,7 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     try {
-      const response = await fetch(`${BACKEND_URL}/login`, {
+      const response = await authFetch('/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,7 +164,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.ok) {
         // Fetch user details
-        const userResponse = await fetch(`${BACKEND_URL}/users/${email}`);
+        const userResponse = await authFetch(`/users/${email}`);
         if (userResponse.ok) {
           const userData: User = await userResponse.json();
           setUser(userData);
@@ -136,12 +172,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Trigger sync after login - pull settings from cloud
           try {
-             const settingsRes = await fetch(`${BACKEND_URL}/users/${email}/settings`);
+             const settingsRes = await authFetch(`/users/${email}/settings`);
              if (settingsRes.ok) {
-                const { data } = await settingsRes.json();
-                if (data && typeof data === 'object') {
-                  if (data.aceConfigs) localStorage.setItem('kikaAcePlotterConfigs', data.aceConfigs);
-                  if (data.endfConfigs) localStorage.setItem('kikaEndfViewerConfigs', data.endfConfigs);
+                const data = await settingsRes.json();
+                if (data?.data && typeof data.data === 'object') {
+                  if (data.data.aceConfigs) localStorage.setItem('kikaAcePlotterConfigs', data.data.aceConfigs);
+                  if (data.data.endfConfigs) localStorage.setItem('kikaEndfViewerConfigs', data.data.endfConfigs);
                 }
              }
           } catch (e) {

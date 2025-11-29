@@ -14,8 +14,12 @@ class Settings(BaseSettings):
     cors_allow_origins: list[str] = [
         "http://localhost:8501",
         "http://localhost:1420",
+        "http://localhost:5173",
+        "http://127.0.0.1:1420",
+        "http://127.0.0.1:5173",
         "tauri://localhost",
-        "https://tauri.localhost"
+        "https://tauri.localhost",
+        "null",  # Tauri webview sometimes sends null origin
     ]
 
     # Email configuration - Brevo API (replaces SMTP)

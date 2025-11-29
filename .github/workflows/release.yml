@@ -60,6 +60,13 @@ jobs:
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: npm run tauri build
 
+      - name: List build artifacts (debug)
+        run: |
+          echo "=== NSIS bundle contents ==="
+          ls -la frontend/src-tauri/target/release/bundle/nsis/ || echo "No nsis folder"
+          echo "=== Checking for signatures ==="
+          find frontend/src-tauri/target/release/bundle -name "*.sig" -o -name "*.zip" | head -20
+
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -116,6 +123,13 @@ jobs:
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: npm run tauri build
 
+      - name: List build artifacts (debug)
+        run: |
+          echo "=== AppImage bundle contents ==="
+          ls -la frontend/src-tauri/target/release/bundle/appimage/ || echo "No appimage folder"
+          echo "=== Checking for signatures ==="
+          find frontend/src-tauri/target/release/bundle -name "*.sig" -o -name "*.tar.gz" | head -20
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -158,16 +172,29 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           
+          echo "=== Debug: List all artifacts ==="
+          find artifacts -type f | head -30
+          
           # Read signatures from the artifact files
           WIN_SIG=""
           LINUX_SIG=""
           
-          if [ -f "artifacts/windows/KIKA_${VERSION}_x64-setup.nsis.zip.sig" ]; then
-            WIN_SIG=$(cat "artifacts/windows/KIKA_${VERSION}_x64-setup.nsis.zip.sig")
+          # Try to find the sig files (might have slightly different names)
+          WIN_SIG_FILE=$(find artifacts/windows -name "*.nsis.zip.sig" 2>/dev/null | head -1)
+          LINUX_SIG_FILE=$(find artifacts/linux -name "*.AppImage.tar.gz.sig" 2>/dev/null | head -1)
+          
+          if [ -n "$WIN_SIG_FILE" ]; then
+            WIN_SIG=$(cat "$WIN_SIG_FILE")
+            echo "Found Windows signature: $WIN_SIG_FILE"
+          else
+            echo "WARNING: No Windows signature file found!"
           fi
           
-          if [ -f "artifacts/linux/kika_${VERSION}_amd64.AppImage.tar.gz.sig" ]; then
-            LINUX_SIG=$(cat "artifacts/linux/kika_${VERSION}_amd64.AppImage.tar.gz.sig")
+          if [ -n "$LINUX_SIG_FILE" ]; then
+            LINUX_SIG=$(cat "$LINUX_SIG_FILE")
+            echo "Found Linux signature: $LINUX_SIG_FILE"
+          else
+            echo "WARNING: No Linux signature file found!"
           fi
           
           cat > artifacts/latest.json << EOF
