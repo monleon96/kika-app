@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "KIKA - Nuclear Data Viewer Desktop Application"
 authors = ["Juan Antonio Monleon <juanmonleon96@gmail.com>"]
 license = "GPL-3.0"
-repository = "https://github.com/monleon96/KIKA"
+repository = "https://github.com/monleon96/kika-app"
 default-run = "kika"
 edition = "2021"
 rust-version = "1.60"
@@ -17,8 +17,11 @@ tauri-build = { version = "1.5.5", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.8.1", features = [] }
+tauri = { version = "1.8.1", features = ["api-all", "updater", "shell-sidecar", "process-relaunch"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
+tokio = { version = "1", features = ["time", "sync"] }
+log = "0.4"
+env_logger = "0.10"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

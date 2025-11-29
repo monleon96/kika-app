@@ -12,16 +12,80 @@
   },
   "tauri": {
     "allowlist": {
-      "all": false
+      "all": false,
+      "fs": {
+        "all": true,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "createDir": true,
+        "removeDir": true,
+        "removeFile": true,
+        "renameFile": true,
+        "exists": true,
+        "scope": ["$APP/**", "$RESOURCE/**", "$HOME/**", "**"]
+      },
+      "dialog": {
+        "all": true,
+        "open": true,
+        "save": true,
+        "message": true,
+        "ask": true,
+        "confirm": true
+      },
+      "shell": {
+        "all": false,
+        "open": true,
+        "sidecar": true,
+        "execute": false,
+        "scope": [
+          {
+            "name": "kika-backend-auth",
+            "sidecar": true
+          },
+          {
+            "name": "kika-backend-core",
+            "sidecar": true
+          }
+        ]
+      },
+      "process": {
+        "all": true,
+        "relaunch": true,
+        "exit": true
+      },
+      "path": {
+        "all": true
+      },
+      "notification": {
+        "all": true
+      },
+      "globalShortcut": {
+        "all": false
+      },
+      "os": {
+        "all": true
+      },
+      "window": {
+        "all": true
+      },
+      "http": {
+        "all": true,
+        "request": true,
+        "scope": ["http://localhost:*", "https://*"]
+      }
     },
     "bundle": {
       "active": true,
       "category": "DeveloperTool",
-      "copyright": "",
+      "copyright": "© 2024 KIKA Team",
       "deb": {
         "depends": []
       },
-      "externalBin": [],
+      "externalBin": [
+        "binaries/kika-backend-auth",
+        "binaries/kika-backend-core"
+      ],
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
@@ -29,8 +93,8 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.tauri.dev",
-      "longDescription": "",
+      "identifier": "com.kika.app",
+      "longDescription": "KIKA is a desktop application for visualizing and analyzing nuclear data files (ACE and ENDF formats). Designed for scientists and engineers working with nuclear data libraries.",
       "macOS": {
         "entitlements": null,
         "exceptionDomain": "",
@@ -39,27 +103,47 @@
         "signingIdentity": null
       },
       "resources": [],
-      "shortDescription": "",
-      "targets": "all",
+      "shortDescription": "Nuclear Data Visualization Tool",
+      "targets": ["msi", "nsis"],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
-        "timestampUrl": ""
+        "timestampUrl": "",
+        "wix": null,
+        "nsis": {
+          "license": null,
+          "installerIcon": null,
+          "headerImage": null,
+          "sidebarImage": null,
+          "installMode": "currentUser",
+          "languages": ["English"],
+          "displayLanguageSelector": false
+        }
       }
     },
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:* https://*; img-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'"
     },
     "updater": {
-      "active": false
+      "active": true,
+      "endpoints": [
+        "https://github.com/monleon96/kika-app/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
     },
     "windows": [
       {
         "fullscreen": false,
-        "height": 600,
+        "height": 800,
+        "width": 1200,
+        "minHeight": 600,
+        "minWidth": 900,
         "resizable": true,
-        "title": "kika-desktop",
-        "width": 800
+        "title": "KIKA - Nuclear Data Viewer",
+        "center": true,
+        "decorations": true,
+        "transparent": false
       }
     ]
   }

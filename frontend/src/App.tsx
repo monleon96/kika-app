@@ -5,6 +5,7 @@ import { theme } from './theme';
 import { AppRoutes } from './routes';
 import { AuthProvider } from './contexts/AuthContext';
 import { FileWorkspaceProvider } from './contexts/FileWorkspaceContext';
+import { UpdateNotification } from './components/UpdateNotification';
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -25,6 +26,7 @@ function App() {
           <AuthProvider>
             <FileWorkspaceProvider>
               <AppRoutes />
+              <UpdateNotification showOnStartup={true} />
             </FileWorkspaceProvider>
           </AuthProvider>
         </BrowserRouter>
