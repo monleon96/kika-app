@@ -2,12 +2,6 @@
  * Application Configuration
  */
 
-// Check if running in Tauri
-const isTauri = '__TAURI__' in window;
-
-// Determine if we're in development mode
-const isDev = import.meta.env.DEV;
-
 // Backend API URL (Auth server - cloud hosted on Render)
 // In dev mode with VITE_BACKEND_URL set, use that (for local testing)
 // Otherwise, always use the Render cloud backend
