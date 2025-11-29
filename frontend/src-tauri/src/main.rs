@@ -213,23 +213,25 @@ fn main() {
             if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
                 let state: State<BackendProcesses> = event.window().state();
 
-                // Kill auth backend
-                {
-                    if let Ok(mut auth) = state.auth.lock() {
+                // Kill auth backend - use match to ensure proper drop order
+                match state.auth.lock() {
+                    Ok(mut auth) => {
                         if let Some(child) = auth.take() {
                             let _ = child.kill();
                         }
                     }
-                } 
+                    Err(_) => {}
+                }
 
                 // Kill core backend
-                {
-                    if let Ok(mut core) = state.core.lock() {
+                match state.core.lock() {
+                    Ok(mut core) => {
                         if let Some(child) = core.take() {
                             let _ = child.kill();
                         }
                     }
-                } 
+                    Err(_) => {}
+                }
             }
         })
         .run(tauri::generate_context!())
@@ -241,39 +243,41 @@ async fn start_sidecar_backends(app: &tauri::AppHandle) -> Result<(), String> {
     use tauri::api::process::Command;
     use std::time::Duration;
 
-    let state: State<BackendProcesses> = app.state();
-
     // Start auth backend
-    let auth_sidecar = Command::new_sidecar("kika-backend-auth")
+    let auth_result = Command::new_sidecar("kika-backend-auth")
         .map_err(|e| e.to_string())?
         .spawn();
 
-    if let Ok((_, child)) = auth_sidecar {
-        {
-            let mut auth = state
-                .auth
-                .lock()
-                .map_err(|e| format!("Failed to lock auth backend state: {}", e))?;
-            *auth = Some(child);
-        } 
+    if let Ok((_, child)) = auth_result {
+        let state: State<BackendProcesses> = app.state();
+        match state.auth.lock() {
+            Ok(mut auth) => {
+                *auth = Some(child);
+            }
+            Err(e) => {
+                log::warn!("Failed to lock auth state: {}", e);
+            }
+        }
     }
 
     // Wait for auth to be ready
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Start core backend
-    let core_sidecar = Command::new_sidecar("kika-backend-core")
+    let core_result = Command::new_sidecar("kika-backend-core")
         .map_err(|e| e.to_string())?
         .spawn();
 
-    if let Ok((_, child)) = core_sidecar {
-        {
-            let mut core = state
-                .core
-                .lock()
-                .map_err(|e| format!("Failed to lock core backend state: {}", e))?;
-            *core = Some(child);
-        } 
+    if let Ok((_, child)) = core_result {
+        let state: State<BackendProcesses> = app.state();
+        match state.core.lock() {
+            Ok(mut core) => {
+                *core = Some(child);
+            }
+            Err(e) => {
+                log::warn!("Failed to lock core state: {}", e);
+            }
+        }
     }
 
     Ok(())
