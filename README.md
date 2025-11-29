@@ -94,10 +94,43 @@ build_windows.bat
 ```
 
 This creates:
-- Windows: MSI and NSIS installers
+- Windows: NSIS installer (.exe)
 - Linux: DEB package and AppImage
 
 See **[Build & Release Guide](docs/BUILD_AND_RELEASE.md)** for detailed instructions.
+
+## System Requirements
+
+### Windows
+- Windows 10 or later (64-bit)
+- **Corporate Proxy Users**: If behind a corporate proxy, authentication may fail. See [Proxy Configuration](#proxy-configuration-windows) below.
+
+### Linux (AppImage)
+- **GLIBC 2.35 or later** required (Ubuntu 22.04+, Fedora 36+, Debian 12+)
+- For older distributions (RHEL 8, CentOS 8, Ubuntu 20.04), try running with:
+  ```bash
+  ./KIKA_*.AppImage --appimage-extract-and-run
+  ```
+- If that doesn't work, a Docker-based build for older systems is planned for future releases
+
+### Linux (DEB package)
+- Debian 12+ or Ubuntu 22.04+
+
+## Proxy Configuration (Windows)
+
+If you're behind a corporate proxy, KIKA may not be able to connect to the authentication server. To fix this:
+
+1. **Copy the template**: Find `scripts/kika_proxy_template.bat` in this repository
+2. **Create your launcher**: Copy it to the same folder as `KIKA.exe` and rename it (e.g., `kika_proxy.bat`)
+3. **Edit the proxy settings**: Open the `.bat` file and uncomment/edit the appropriate line:
+   ```batch
+   REM For proxy WITH authentication:
+   set "HTTP_PROXY=http://YOUR_USER:YOUR_PASSWORD@proxy.example.com:8080"
+   
+   REM For proxy WITHOUT authentication:
+   set "HTTP_PROXY=http://proxy.example.com:8080"
+   ```
+4. **Launch KIKA**: Double-click your `.bat` file instead of `KIKA.exe`
 
 ## Documentation
 

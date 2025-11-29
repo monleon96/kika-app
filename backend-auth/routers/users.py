@@ -92,6 +92,23 @@ async def update_user_settings(
     return OkResponse()
 
 
+@router.post("/users/deactivate", response_model=OkResponse)
+async def deactivate_own_account(
+    payload: AdminDeactivateUserRequest,
+    session: AsyncSession = Depends(get_session),
+) -> OkResponse:
+    """Allow users to deactivate (soft delete) their own account."""
+    email = payload.email.lower()
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.is_active = False
+    await session.commit()
+    return OkResponse()
+
+
 @router.post("/admin/users/create", response_model=AdminUser)
 async def admin_create_user(
     payload: AdminCreateUserRequest,

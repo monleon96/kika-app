@@ -47,6 +47,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
+  register: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
   loginAsGuest: () => void;
   logout: () => void;
   syncSettings: () => Promise<void>;
@@ -194,6 +195,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const register = async (email: string, password: string) => {
+    if (!isOnline) {
+      return { success: false, message: 'No internet connection. Registration requires an internet connection.' };
+    }
+
+    try {
+      const response = await authFetch('/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        return { 
+          success: true, 
+          message: 'Registration successful! Please check your email to verify your account before signing in.' 
+        };
+      }
+
+      // Try to get error message from response
+      try {
+        const errorData = await response.json();
+        return { success: false, message: errorData.detail || 'Registration failed' };
+      } catch {
+        return { success: false, message: 'Registration failed. Please try again.' };
+      }
+    } catch (error) {
+      return { success: false, message: 'Connection error. Check your internet connection.' };
+    }
+  };
+
   const loginAsGuest = () => {
     const guestUser: User = {
       email: 'guest@local',
@@ -216,7 +250,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, loginAsGuest, logout, syncSettings, isLoading, isOnline }}>
+    <AuthContext.Provider value={{ user, login, register, loginAsGuest, logout, syncSettings, isLoading, isOnline }}>
       {children}
     </AuthContext.Provider>
   );

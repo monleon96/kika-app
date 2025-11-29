@@ -3,8 +3,23 @@
 
 use std::env;
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::api::process::{Command, CommandChild};
 use tauri::{Manager, State};
+use once_cell::sync::Lazy;
+
+// Shared HTTP client that respects system proxy settings
+// reqwest automatically detects HTTP_PROXY, HTTPS_PROXY, and NO_PROXY environment variables
+static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
+    reqwest::Client::builder()
+        // Use native TLS for better Windows certificate and proxy compatibility
+        .use_native_tls()
+        // Set reasonable timeouts
+        .connect_timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(30))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+});
 
 // Store backend process handles
 struct BackendProcesses {
@@ -62,7 +77,7 @@ async fn stop_backends(state: State<'_, BackendProcesses>) -> Result<String, Str
 async fn check_core_health() -> Result<bool, String> {
     let url = format!("{}/healthz", get_core_backend_url());
     
-    match reqwest::get(&url).await {
+    match HTTP_CLIENT.get(&url).send().await {
         Ok(response) => Ok(response.status().is_success()),
         Err(_) => Ok(false),
     }
@@ -73,9 +88,12 @@ async fn check_core_health() -> Result<bool, String> {
 async fn check_auth_health() -> Result<bool, String> {
     let url = format!("{}/healthz", get_auth_backend_url());
     
-    match reqwest::get(&url).await {
+    match HTTP_CLIENT.get(&url).send().await {
         Ok(response) => Ok(response.status().is_success()),
-        Err(_) => Ok(false),
+        Err(e) => {
+            log::warn!("Auth health check failed: {}. This may be a proxy issue.", e);
+            Ok(false)
+        },
     }
 }
 
@@ -100,12 +118,11 @@ async fn call_backend_api(
 ) -> Result<serde_json::Value, String> {
     let backend_url = get_auth_backend_url();
     let url = format!("{}{}", backend_url, endpoint);
-    let client = reqwest::Client::new();
     
     let response = match method.as_str() {
-        "GET" => client.get(&url).send().await,
+        "GET" => HTTP_CLIENT.get(&url).send().await,
         "POST" => {
-            let req = client.post(&url);
+            let req = HTTP_CLIENT.post(&url);
             if let Some(data) = body {
                 req.json(&data).send().await
             } else {
@@ -122,7 +139,17 @@ async fn call_backend_api(
                 Err(e) => Err(format!("Failed to parse response: {}", e)),
             }
         }
-        Err(e) => Err(format!("Request failed: {}", e)),
+        Err(e) => {
+            // Provide helpful error message for proxy issues
+            let error_msg = if e.is_connect() {
+                format!("Connection failed: {}. If you're behind a corporate proxy, you may need to set HTTP_PROXY/HTTPS_PROXY environment variables.", e)
+            } else if e.is_timeout() {
+                format!("Request timed out: {}. Check your network connection.", e)
+            } else {
+                format!("Request failed: {}", e)
+            };
+            Err(error_msg)
+        }
     }
 }
 
@@ -141,6 +168,18 @@ fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+// Get network/proxy diagnostics for debugging
+#[tauri::command]
+fn get_network_diagnostics() -> serde_json::Value {
+    serde_json::json!({
+        "http_proxy": env::var("HTTP_PROXY").ok(),
+        "https_proxy": env::var("HTTPS_PROXY").ok(),
+        "no_proxy": env::var("NO_PROXY").ok(),
+        "auth_url": get_auth_backend_url(),
+        "core_url": get_core_backend_url(),
+    })
+}
+
 // Get sidecar status for debugging
 #[tauri::command]
 async fn get_sidecar_status(state: State<'_, BackendProcesses>) -> Result<String, String> {
@@ -152,7 +191,7 @@ async fn get_sidecar_status(state: State<'_, BackendProcesses>) -> Result<String
     
     // Now safe to await since MutexGuard is dropped
     let health_url = format!("{}/healthz", get_core_backend_url());
-    let health_ok = match reqwest::get(&health_url).await {
+    let health_ok = match HTTP_CLIENT.get(&health_url).send().await {
         Ok(response) => response.status().is_success(),
         Err(_) => false,
     };
@@ -182,6 +221,7 @@ fn main() {
             stop_backends,
             get_app_version,
             get_sidecar_status,
+            get_network_diagnostics,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]
@@ -264,7 +304,7 @@ async fn start_sidecar_backends(app: &tauri::AppHandle) -> Result<(), String> {
     
     // Check if it's actually running
     let health_url = format!("{}/healthz", get_core_backend_url());
-    match reqwest::get(&health_url).await {
+    match HTTP_CLIENT.get(&health_url).send().await {
         Ok(response) if response.status().is_success() => {
             log::info!("Core backend is healthy and responding");
         }

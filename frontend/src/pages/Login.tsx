@@ -9,31 +9,69 @@ import {
   Button,
   Typography,
   Alert,
+  Link,
+  Divider,
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, loginAsGuest } = useAuth();
+  const { login, register, loginAsGuest } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
-    const result = await login(email, password);
+    if (isRegisterMode) {
+      // Registration mode
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        setLoading(false);
+        return;
+      }
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters');
+        setLoading(false);
+        return;
+      }
 
-    if (result.success) {
-      navigate('/');
+      const result = await register(email, password);
+      if (result.success) {
+        setSuccess(result.message);
+        setIsRegisterMode(false);
+        setPassword('');
+        setConfirmPassword('');
+      } else {
+        setError(result.message);
+      }
     } else {
-      setError(result.message);
+      // Login mode
+      const result = await login(email, password);
+      if (result.success) {
+        navigate('/');
+      } else {
+        setError(result.message);
+      }
     }
 
     setLoading(false);
+  };
+
+  const toggleMode = () => {
+    setIsRegisterMode(!isRegisterMode);
+    setError('');
+    setSuccess('');
+    setPassword('');
+    setConfirmPassword('');
   };
 
   const handleGuestLogin = () => {
@@ -67,6 +105,12 @@ export const Login: React.FC = () => {
               </Alert>
             )}
 
+            {success && (
+              <Alert severity="success" sx={{ mt: 2, mb: 2 }}>
+                {success}
+              </Alert>
+            )}
+
             <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
               <TextField
                 fullWidth
@@ -86,7 +130,19 @@ export const Login: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 margin="normal"
                 required
+                helperText={isRegisterMode ? 'Minimum 8 characters' : ''}
               />
+              {isRegisterMode && (
+                <TextField
+                  fullWidth
+                  label="Confirm Password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  margin="normal"
+                  required
+                />
+              )}
               <Button
                 type="submit"
                 fullWidth
@@ -95,15 +151,37 @@ export const Login: React.FC = () => {
                 disabled={loading}
                 sx={{ mt: 3 }}
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading 
+                  ? (isRegisterMode ? 'Creating account...' : 'Signing in...') 
+                  : (isRegisterMode ? 'Create Account' : 'Sign In')}
               </Button>
+
+              <Box sx={{ mt: 2, textAlign: 'center' }}>
+                <Typography variant="body2" component="span" color="text.secondary">
+                  {isRegisterMode ? 'Already have an account? ' : "Don't have an account? "}
+                </Typography>
+                <Link
+                  component="button"
+                  type="button"
+                  variant="body2"
+                  onClick={toggleMode}
+                  sx={{ cursor: 'pointer' }}
+                >
+                  {isRegisterMode ? 'Sign In' : 'Register'}
+                </Link>
+              </Box>
+
+              <Divider sx={{ my: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  or
+                </Typography>
+              </Divider>
 
               <Button
                 fullWidth
                 variant="outlined"
                 size="large"
                 onClick={handleGuestLogin}
-                sx={{ mt: 2 }}
               >
                 🚀 Continue as Guest
               </Button>

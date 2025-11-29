@@ -18,10 +18,12 @@ tauri-build = { version = "1.5.5", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.8.1", features = ["updater", "shell-sidecar", "dialog-all", "fs-all", "http-all", "notification-all", "os-all", "path-all", "process-all", "shell-open", "window-all"] }
-reqwest = { version = "0.11", features = ["json", "blocking"] }
+# Enable native-tls for better system proxy detection on Windows
+reqwest = { version = "0.11", features = ["json", "blocking", "native-tls"] }
 tokio = { version = "1", features = ["time", "sync"] }
 log = "0.4"
 env_logger = "0.10"
+once_cell = "1.19"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

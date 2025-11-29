@@ -152,6 +152,157 @@ async def forgot_password(
     return OkResponse()
 
 
+@router.get("/password/reset", response_class=HTMLResponse)
+async def password_reset_form(token: str) -> HTMLResponse:
+    """Show password reset form."""
+    # Verify token is valid before showing form
+    try:
+        verify_reset_token(token)
+    except HTTPException:
+        return HTMLResponse(
+            status_code=400,
+            content="""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>KIKA - Password Reset</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                           display: flex; justify-content: center; align-items: center; min-height: 100vh; 
+                           margin: 0; background: #f5f5f5; }
+                    .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+                                 max-width: 400px; width: 90%; text-align: center; }
+                    h1 { color: #d32f2f; margin-bottom: 1rem; }
+                    p { color: #666; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>❌ Invalid or Expired Link</h1>
+                    <p>This password reset link is invalid or has expired.</p>
+                    <p>Please request a new password reset from the KIKA app.</p>
+                </div>
+            </body>
+            </html>
+            """
+        )
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>KIKA - Reset Password</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                   display: flex; justify-content: center; align-items: center; min-height: 100vh; 
+                   margin: 0; background: #f5f5f5; }}
+            .container {{ background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+                         max-width: 400px; width: 90%; }}
+            h1 {{ color: #1976d2; text-align: center; margin-bottom: 1.5rem; }}
+            .form-group {{ margin-bottom: 1rem; }}
+            label {{ display: block; margin-bottom: 0.5rem; font-weight: 500; color: #333; }}
+            input {{ width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; 
+                    font-size: 1rem; box-sizing: border-box; }}
+            input:focus {{ outline: none; border-color: #1976d2; }}
+            button {{ width: 100%; padding: 0.75rem; background: #1976d2; color: white; border: none; 
+                     border-radius: 4px; font-size: 1rem; cursor: pointer; margin-top: 1rem; }}
+            button:hover {{ background: #1565c0; }}
+            button:disabled {{ background: #ccc; cursor: not-allowed; }}
+            .error {{ color: #d32f2f; font-size: 0.875rem; margin-top: 0.5rem; display: none; }}
+            .success {{ text-align: center; }}
+            .success h2 {{ color: #2e7d32; }}
+            .hint {{ font-size: 0.75rem; color: #666; margin-top: 0.25rem; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div id="form-container">
+                <h1>⚛️ KIKA</h1>
+                <h2 style="text-align: center; color: #333; font-weight: normal;">Reset Your Password</h2>
+                <form id="reset-form">
+                    <div class="form-group">
+                        <label for="password">New Password</label>
+                        <input type="password" id="password" name="password" required minlength="8">
+                        <div class="hint">Minimum 8 characters</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm">Confirm Password</label>
+                        <input type="password" id="confirm" name="confirm" required minlength="8">
+                    </div>
+                    <div id="error" class="error"></div>
+                    <button type="submit" id="submit-btn">Reset Password</button>
+                </form>
+            </div>
+            <div id="success-container" class="success" style="display: none;">
+                <h2>✅ Password Reset Successfully!</h2>
+                <p>You can now sign in to KIKA with your new password.</p>
+            </div>
+        </div>
+        <script>
+            const form = document.getElementById('reset-form');
+            const errorDiv = document.getElementById('error');
+            const submitBtn = document.getElementById('submit-btn');
+            const formContainer = document.getElementById('form-container');
+            const successContainer = document.getElementById('success-container');
+            
+            form.addEventListener('submit', async (e) => {{
+                e.preventDefault();
+                errorDiv.style.display = 'none';
+                
+                const password = document.getElementById('password').value;
+                const confirm = document.getElementById('confirm').value;
+                
+                if (password !== confirm) {{
+                    errorDiv.textContent = 'Passwords do not match';
+                    errorDiv.style.display = 'block';
+                    return;
+                }}
+                
+                if (password.length < 8) {{
+                    errorDiv.textContent = 'Password must be at least 8 characters';
+                    errorDiv.style.display = 'block';
+                    return;
+                }}
+                
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Resetting...';
+                
+                try {{
+                    const response = await fetch('/password/reset', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{
+                            token: '{token}',
+                            new_password: password
+                        }})
+                    }});
+                    
+                    if (response.ok) {{
+                        formContainer.style.display = 'none';
+                        successContainer.style.display = 'block';
+                    }} else {{
+                        const data = await response.json();
+                        errorDiv.textContent = data.detail || 'Failed to reset password. Please try again.';
+                        errorDiv.style.display = 'block';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Reset Password';
+                    }}
+                }} catch (err) {{
+                    errorDiv.textContent = 'Connection error. Please try again.';
+                    errorDiv.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Reset Password';
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+
 @router.post("/password/reset", response_model=OkResponse)
 async def reset_password(payload: ResetPasswordRequest, session: AsyncSession = Depends(get_session)) -> OkResponse:
     email = verify_reset_token(payload.token).lower()
