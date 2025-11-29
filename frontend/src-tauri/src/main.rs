@@ -144,9 +144,13 @@ fn get_app_version() -> String {
 // Get sidecar status for debugging
 #[tauri::command]
 async fn get_sidecar_status(state: State<'_, BackendProcesses>) -> Result<String, String> {
-    let core_guard = state.core.lock().map_err(|e| e.to_string())?;
-    let core_running = core_guard.is_some();
+    // Check if sidecar process is tracked (drop guard before await)
+    let core_running = {
+        let core_guard = state.core.lock().map_err(|e| e.to_string())?;
+        core_guard.is_some()
+    };
     
+    // Now safe to await since MutexGuard is dropped
     let health_url = format!("{}/healthz", get_core_backend_url());
     let health_ok = match reqwest::get(&health_url).await {
         Ok(response) => response.status().is_success(),
