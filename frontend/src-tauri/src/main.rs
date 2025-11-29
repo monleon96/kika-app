@@ -213,14 +213,18 @@ fn main() {
             if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
                 // Stop backends when the window is closed
                 let state: State<BackendProcesses> = event.window().state();
-                if let Ok(mut auth) = state.auth.lock() {
-                    if let Some(child) = auth.take() {
-                        let _ = child.kill();
+                {
+                    if let Ok(mut auth) = state.auth.lock() {
+                        if let Some(child) = auth.take() {
+                            let _ = child.kill();
+                        }
                     }
                 }
-                if let Ok(mut core) = state.core.lock() {
-                    if let Some(child) = core.take() {
-                        let _ = child.kill();
+                {
+                    if let Ok(mut core) = state.core.lock() {
+                        if let Some(child) = core.take() {
+                            let _ = child.kill();
+                        }
                     }
                 }
             }
@@ -239,8 +243,10 @@ async fn start_sidecar_backends(app: &tauri::AppHandle) -> Result<(), String> {
         .spawn()
     {
         let state: State<BackendProcesses> = app.state();
-        if let Ok(mut auth) = state.auth.lock() {
-            *auth = Some(child);
+        {
+            if let Ok(mut auth) = state.auth.lock() {
+                *auth = Some(child);
+            }
         }
     }
     
@@ -253,8 +259,10 @@ async fn start_sidecar_backends(app: &tauri::AppHandle) -> Result<(), String> {
         .spawn()
     {
         let state: State<BackendProcesses> = app.state();
-        if let Ok(mut core) = state.core.lock() {
-            *core = Some(child);
+        {
+            if let Ok(mut core) = state.core.lock() {
+                *core = Some(child);
+            }
         }
     }
     
