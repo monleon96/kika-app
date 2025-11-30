@@ -5,7 +5,6 @@ import type {
   Config as PlotlyConfig,
   Layout as PlotlyLayout,
   PlotData,
-  PlotlyHTMLElement,
 } from 'plotly.js';
 type PlotlyMarkerSymbol = NonNullable<PlotData['marker']>['symbol'];
 type PlotTrace = Partial<PlotData>;
@@ -60,7 +59,7 @@ export interface LoadedACEFile {
   error?: string;
 }
 
-interface PlotViewerProps {
+interface ACEPlotViewerProps {
   files: LoadedACEFile[];
 }
 
@@ -208,7 +207,7 @@ const formatTimestamp = (iso: string) => {
   return date.toLocaleString();
 };
 
-export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
+export const ACEPlotViewer: React.FC<ACEPlotViewerProps> = ({ files }) => {
   const [plotType, setPlotType] = useState<PlotType>('xs');
   const [figureSettings, setFigureSettings] = useState<FigureSettings>(() => getDefaultFigureSettings('xs'));
   const [seriesConfigs, setSeriesConfigs] = useState<SeriesConfig[]>([]);
@@ -219,12 +218,14 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
   const [savedConfigs, setSavedConfigs] = useState<SavedPlotConfig[]>([]);
   const [exportOptions] = useState({ format: 'png', width: 1200, height: 720, scale: 2 });
   const [exporting, setExporting] = useState(false);
-  const plotRef = useRef<PlotlyHTMLElement | null>(null);
+  const plotRef = useRef<HTMLElement | null>(null);
   const [showMatplotlibExport, setShowMatplotlibExport] = useState(false);
   const [matplotlibExportSettings, setMatplotlibExportSettings] = useState({
-    style: 'publication',
+    style: 'light',
     format: 'png',
     dpi: 300,
+    figWidthInches: 10,
+    figHeightInches: 6,
   });
   const [previewImage, setPreviewImage] = useState<{
     base64: string;
@@ -270,15 +271,15 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
   };
 
   const handleAddSeries = () => {
-    console.log('[PlotViewer] handleAddSeries called, files:', files.length);
+    console.log('[ACEPlotViewer] handleAddSeries called, files:', files.length);
     if (files.length === 0) {
-      console.log('[PlotViewer] No files available');
+      console.log('[ACEPlotViewer] No files available');
       return;
     }
     const defaultFile = files[0];
-    console.log('[PlotViewer] Default file:', defaultFile.name, 'has info:', !!defaultFile.info);
+    console.log('[ACEPlotViewer] Default file:', defaultFile.name, 'has info:', !!defaultFile.info);
     const mtList = getAvailableMts(defaultFile, plotType);
-    console.log('[PlotViewer] Available MTs:', mtList);
+    console.log('[ACEPlotViewer] Available MTs:', mtList);
     const nextSeries: SeriesConfig = {
       id: createSeriesId(),
       fileName: defaultFile.name,
@@ -294,7 +295,7 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
       markerSymbol: 'circle',
       markerSize: 8,
     };
-    console.log('[PlotViewer] Creating series:', nextSeries);
+    console.log('[ACEPlotViewer] Creating series:', nextSeries);
     setSeriesConfigs((prev) => [...prev, nextSeries]);
   };
 
@@ -350,7 +351,7 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
         energy: plotType === 'angular' ? series.energy ?? DEFAULT_ANGULAR_ENERGY : undefined,
       })
         .then((data) => {
-          console.log('[PlotViewer] Received data from server:', {
+          console.log('[ACEPlotViewer] Received data from server:', {
             seriesId: series.id,
             label: data.label,
             xLength: data.x?.length,
@@ -379,7 +380,7 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
           );
         })
         .catch((error) => {
-          console.error('[PlotViewer] Error fetching series data:', error);
+          console.error('[ACEPlotViewer] Error fetching series data:', error);
           setSeriesDataMap((prev) => ({
             ...prev,
             [series.id]: { status: 'error', signature, error: error instanceof Error ? error.message : 'Failed to load data' },
@@ -420,7 +421,7 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
           traceInfo.yMax = Math.max(...yArr);
         }
         
-        console.log('[PlotViewer] Creating trace:', traceInfo.label);
+        console.log('[ACEPlotViewer] Creating trace:', traceInfo.label);
         console.log('  Data points:', traceInfo.xLength, 'x', traceInfo.yLength);
         if (traceInfo.xMin !== undefined) {
           console.log('  X range:', traceInfo.xMin, 'to', traceInfo.xMax);
@@ -454,9 +455,9 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
       })
       .filter(Boolean) as PlotTrace[];
     
-    console.log('[PlotViewer] Total traces:', traces.length);
+    console.log('[ACEPlotViewer] Total traces:', traces.length);
     if (traces.length > 0) {
-      console.log('[PlotViewer] First trace passed to Plotly:', {
+      console.log('[ACEPlotViewer] First trace passed to Plotly:', {
         name: traces[0].name,
         type: traces[0].type,
         mode: traces[0].mode,
@@ -616,7 +617,7 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
       },
     };
     
-    console.log('[PlotViewer] Layout config:');
+    console.log('[ACEPlotViewer] Layout config:');
     console.log(JSON.stringify({
       xType: layoutConfig.xaxis.type,
       yType: layoutConfig.yaxis.type,
@@ -763,8 +764,8 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
         minorGridAlpha: figureSettings.minorGridAlpha,
         showLegend: figureSettings.showLegend,
         legendPosition: figureSettings.legendPosition,
-        figWidthInches: figureSettings.figWidthInches,
-        figHeightInches: figureSettings.figHeightInches,
+        figWidthInches: matplotlibExportSettings.figWidthInches,
+        figHeightInches: matplotlibExportSettings.figHeightInches,
         titleFontSize: figureSettings.titleFontSize,
         labelFontSize: figureSettings.labelFontSize,
         legendFontSize: figureSettings.legendFontSize,
@@ -789,11 +790,17 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
 
     setGeneratingPreview(true);
     try {
-      // Always generate PNG preview at lower DPI for quick display
+      // Use fixed responsive size for live preview (10x6 inches at 80 DPI = 800x480 for fast loading)
+      const baseExportData = prepareExportData();
       const previewData = {
-        ...prepareExportData(),
+        ...baseExportData,
         export_format: 'png',  // Always PNG for preview
-        dpi: 150,  // Lower DPI for faster preview generation
+        dpi: 80,  // Low DPI for fast responsive preview
+        figure_settings: {
+          ...baseExportData.figure_settings,
+          figWidthInches: 10,  // Fixed responsive preview size
+          figHeightInches: 6,
+        },
       };
       const result = await exportWithMatplotlib(previewData);
 
@@ -1458,13 +1465,100 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
               </AccordionDetails>
             </Accordion>
 
+            {/* Tick Labels */}
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle1">🔢 Tick Labels</Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 4 }}>
+                <Stack spacing={2}>
+                  <Typography variant="subtitle2">X-axis Ticks</Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={4}>
+                      <TextField
+                        label="Font Size"
+                        type="number"
+                        value={figureSettings.tickFontSizeX}
+                        onChange={(event) => setFigureSettings({ ...figureSettings, tickFontSizeX: Number(event.target.value) })}
+                        inputProps={{ min: 6, max: 20, step: 1 }}
+                        fullWidth
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={4}>
+                      <TextField
+                        label="Max Ticks"
+                        type="number"
+                        value={figureSettings.maxTicksX}
+                        onChange={(event) => setFigureSettings({ ...figureSettings, maxTicksX: Number(event.target.value) })}
+                        inputProps={{ min: 3, max: 20, step: 1 }}
+                        fullWidth
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={4}>
+                      <TextField
+                        label="Rotation (°)"
+                        type="number"
+                        value={figureSettings.rotateTicksX}
+                        onChange={(event) => setFigureSettings({ ...figureSettings, rotateTicksX: Number(event.target.value) })}
+                        inputProps={{ min: 0, max: 90, step: 15 }}
+                        fullWidth
+                        size="small"
+                      />
+                    </Grid>
+                  </Grid>
+
+                  <Typography variant="subtitle2" sx={{ mt: 2 }}>Y-axis Ticks</Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={4}>
+                      <TextField
+                        label="Font Size"
+                        type="number"
+                        value={figureSettings.tickFontSizeY}
+                        onChange={(event) => setFigureSettings({ ...figureSettings, tickFontSizeY: Number(event.target.value) })}
+                        inputProps={{ min: 6, max: 20, step: 1 }}
+                        fullWidth
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={4}>
+                      <TextField
+                        label="Max Ticks"
+                        type="number"
+                        value={figureSettings.maxTicksY}
+                        onChange={(event) => setFigureSettings({ ...figureSettings, maxTicksY: Number(event.target.value) })}
+                        inputProps={{ min: 3, max: 20, step: 1 }}
+                        fullWidth
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={4}>
+                      <TextField
+                        label="Rotation (°)"
+                        type="number"
+                        value={figureSettings.rotateTicksY}
+                        onChange={(event) => setFigureSettings({ ...figureSettings, rotateTicksY: Number(event.target.value) })}
+                        inputProps={{ min: 0, max: 90, step: 15 }}
+                        fullWidth
+                        size="small"
+                      />
+                    </Grid>
+                  </Grid>
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+
             {/* Figure Size */}
-            <Accordion defaultExpanded>
+            <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography variant="subtitle1">📐 Figure Size</Typography>
               </AccordionSummary>
               <AccordionDetails sx={{ p: 4 }}>
                 <Stack spacing={2}>
+                  <Typography variant="caption" color="text.secondary">
+                    Set the size in inches for high-quality exports
+                  </Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={6}>
                       <TextField
@@ -1482,401 +1576,280 @@ export const PlotViewer: React.FC<PlotViewerProps> = ({ files }) => {
                         type="number"
                         value={figureSettings.figHeightInches}
                         onChange={(event) => setFigureSettings({ ...figureSettings, figHeightInches: Number(event.target.value) })}
-                        inputProps={{ min: 3, max: 16, step: 0.5 }}
+                        inputProps={{ min: 3, max: 15, step: 0.5 }}
                         fullWidth
                       />
                     </Grid>
                   </Grid>
-                  <Typography variant="caption" color="text.secondary">
-                    Display: {Math.round(figureSettings.figWidthInches * 96)} × {Math.round(figureSettings.figHeightInches * 96)} pixels @ 96 DPI
-                  </Typography>
                 </Stack>
               </AccordionDetails>
             </Accordion>
 
-            {/* Advanced: Tick Parameters */}
+            {/* Save/Restore Configurations */}
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1">⚙️ Advanced: Tick Parameters</Typography>
+                <Typography variant="subtitle1">💾 Save/Restore Configuration</Typography>
               </AccordionSummary>
               <AccordionDetails sx={{ p: 4 }}>
                 <Stack spacing={2}>
-                  <Typography variant="subtitle2">X-axis Ticks</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Font Size"
-                        type="number"
-                        value={figureSettings.tickFontSizeX}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, tickFontSizeX: Number(event.target.value) })}
-                        inputProps={{ min: 6, max: 20, step: 1 }}
-                        fullWidth
-                      />
-                    </Grid>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Max Ticks"
-                        type="number"
-                        value={figureSettings.maxTicksX}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, maxTicksX: Number(event.target.value) })}
-                        inputProps={{ min: 3, max: 20, step: 1 }}
-                        fullWidth
-                      />
-                    </Grid>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Rotation (°)"
-                        type="number"
-                        value={figureSettings.rotateTicksX}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, rotateTicksX: Number(event.target.value) })}
-                        inputProps={{ min: 0, max: 90, step: 15 }}
-                        fullWidth
-                      />
-                    </Grid>
-                  </Grid>
+                  <TextField
+                    label="Configuration Name"
+                    value={configName}
+                    onChange={(event) => setConfigName(event.target.value)}
+                    placeholder="Enter name to save current plot..."
+                    fullWidth
+                  />
+                  <Button
+                    startIcon={<SaveOutlinedIcon />}
+                    variant="contained"
+                    onClick={handleSaveConfig}
+                    disabled={seriesConfigs.length === 0}
+                    fullWidth
+                  >
+                    Save Current Plot
+                  </Button>
 
-                  <Typography variant="subtitle2" sx={{ mt: 1 }}>Y-axis Ticks</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Font Size"
-                        type="number"
-                        value={figureSettings.tickFontSizeY}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, tickFontSizeY: Number(event.target.value) })}
-                        inputProps={{ min: 6, max: 20, step: 1 }}
-                        fullWidth
-                      />
-                    </Grid>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Max Ticks"
-                        type="number"
-                        value={figureSettings.maxTicksY}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, maxTicksY: Number(event.target.value) })}
-                        inputProps={{ min: 3, max: 20, step: 1 }}
-                        fullWidth
-                      />
-                    </Grid>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Rotation (°)"
-                        type="number"
-                        value={figureSettings.rotateTicksY}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, rotateTicksY: Number(event.target.value) })}
-                        inputProps={{ min: 0, max: 90, step: 15 }}
-                        fullWidth
-                      />
-                    </Grid>
-                  </Grid>
+                  {savedConfigs.length > 0 && (
+                    <>
+                      <Divider sx={{ my: 2 }} />
+                      <Typography variant="subtitle2">Saved Configurations (Session)</Typography>
+                      {savedConfigs.map((config) => (
+                        <Paper key={config.id} sx={{ p: 2 }} variant="outlined">
+                          <Stack spacing={1}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="body2" fontWeight="medium">
+                                {config.name}
+                              </Typography>
+                              <IconButton size="small" onClick={() => handleDeleteConfig(config.id)}>
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatTimestamp(config.createdAt)} • {config.series.length} series
+                            </Typography>
+                            <Button
+                              startIcon={<RestoreOutlinedIcon />}
+                              size="small"
+                              onClick={() => handleRestoreConfig(config.id)}
+                            >
+                              Restore
+                            </Button>
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </>
+                  )}
                 </Stack>
               </AccordionDetails>
             </Accordion>
           </Paper>
-
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Saved Configurations
-            </Typography>
-            <Stack spacing={2}>
-              <TextField
-                label="Configuration Name"
-                value={configName}
-                onChange={(event) => setConfigName(event.target.value)}
-              />
-              <Button
-                variant="contained"
-                startIcon={<SaveOutlinedIcon />}
-                onClick={handleSaveConfig}
-                disabled={files.length === 0}
-              >
-                Save Current Setup
-              </Button>
-              {savedConfigs.length === 0 && (
-                <Alert severity="info">No saved plots yet. Save your layout to reuse later.</Alert>
-              )}
-              {savedConfigs.map((configInfo) => (
-                <Paper key={configInfo.id} variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="subtitle1">{configInfo.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {configInfo.plotType === 'xs' ? 'Cross Section' : 'Angular'} • {formatTimestamp(configInfo.createdAt)}
-                  </Typography>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Button
-                      startIcon={<RestoreOutlinedIcon />}
-                      size="small"
-                      onClick={() => handleRestoreConfig(configInfo.id)}
-                    >
-                      Restore
-                    </Button>
-                    <Button
-                      size="small"
-                      color="error"
-                      onClick={() => handleDeleteConfig(configInfo.id)}
-                    >
-                      Delete
-                    </Button>
-                  </Stack>
-                </Paper>
-              ))}
-            </Stack>
-          </Paper>
-
-          {notification && (
-            <Alert severity={notification.type} onClose={() => setNotification(null)}>
-              {notification.message}
-            </Alert>
-          )}
         </Stack>
       </Grid>
 
+      {/* Plot Display */}
       <Grid item xs={12} lg={8}>
-        <Box sx={{ position: 'sticky', top: 16, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto' }}>
-          <Paper sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="h6">📊 Plot Preview</Typography>
-            {plotlyData.length === 0 ? (
-              <Box
-                sx={{
-                  minHeight: 400,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '2px dashed',
-                  borderColor: 'grey.300',
-                  borderRadius: 2,
-                }}
-              >
-                <Typography color="text.secondary" align="center">
-                  👈 Configure series on the left and the plot will appear here in real time
-                </Typography>
-              </Box>
-            ) : (
-              <Box sx={{ 
-                width: '100%',
-                height: 'fit-content',
-                maxWidth: '100%',
-                overflow: 'auto',
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1,
-                bgcolor: 'background.paper',
-              }}>
-                <Plot
-                  data={plotlyData}
-                  layout={layout}
-                  config={config}
-                  style={{ width: '100%', display: 'block' }}
-                  useResizeHandler={false}
-                  divId="ace-plot"
-                  onInitialized={(figure, graphDiv) => {
-                    console.log('[PlotViewer] ✅ Plot initialized!', figure, graphDiv);
-                    plotRef.current = graphDiv as PlotlyHTMLElement;
-                  }}
-                  onUpdate={(figure, graphDiv) => {
-                    console.log('[PlotViewer] ✅ Plot updated!', figure);
-                    plotRef.current = graphDiv as PlotlyHTMLElement;
-                  }}
-                  onError={(err) => {
-                    console.error('[PlotViewer] ❌ Plot error:', err);
-                  }}
-                />
-              </Box>
-            )}
-
-            <Divider />
-
-            <Stack direction="row" spacing={2}>
+        <Paper sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Plot Preview</Typography>
+            <Stack direction="row" spacing={1}>
               <Button
-                variant="outlined"
                 startIcon={<DownloadIcon />}
+                variant="outlined"
                 onClick={handleExport}
-                disabled={exporting || plotlyData.length === 0}
-                fullWidth
+                disabled={plotlyData.length === 0 || exporting}
+                size="small"
               >
-                {exporting ? 'Exporting...' : 'Quick Export (Plotly)'}
+                Export (Plotly)
               </Button>
               <Button
-                variant="contained"
                 startIcon={<HighQualityIcon />}
+                variant="contained"
                 onClick={() => setShowMatplotlibExport(true)}
-                disabled={exporting || plotlyData.length === 0}
-                fullWidth
-                color="secondary"
+                disabled={seriesConfigs.length === 0}
+                size="small"
               >
                 Export (High Quality)
               </Button>
             </Stack>
-          </Paper>
-        </Box>
+          </Box>
+
+          {plotlyData.length === 0 ? (
+            <Alert severity="info">
+              Add data series from the workspace panel to start plotting.
+            </Alert>
+          ) : (
+            <Box sx={{ width: '100%', height: 600 }}>
+              <Plot
+                data={plotlyData}
+                layout={layout}
+                config={config}
+                style={{ width: '100%', height: '100%' }}
+                useResizeHandler
+                onInitialized={(_figure, graphDiv) => {
+                  plotRef.current = graphDiv as unknown as HTMLElement;
+                }}
+                onUpdate={(_figure, graphDiv) => {
+                  plotRef.current = graphDiv as unknown as HTMLElement;
+                }}
+              />
+            </Box>
+          )}
+        </Paper>
       </Grid>
 
-      {/* Matplotlib Export Dialog */}
-      <Dialog 
-        open={showMatplotlibExport} 
-        onClose={() => {
-          setShowMatplotlibExport(false);
-          setPreviewImage(null);
-        }} 
-        maxWidth="md"
+      {/* High Quality Export Dialog */}
+      <Dialog
+        open={showMatplotlibExport}
+        onClose={() => setShowMatplotlibExport(false)}
+        maxWidth="lg"
         fullWidth
       >
-        <DialogTitle>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <HighQualityIcon color="secondary" />
-            <Typography variant="h6">High-Quality Export (Matplotlib)</Typography>
-          </Stack>
-        </DialogTitle>
+        <DialogTitle>Export High-Quality Plot (Matplotlib)</DialogTitle>
         <DialogContent>
-          <Grid container spacing={3} sx={{ mt: 0 }}>
-            {/* Left side: Settings */}
-            <Grid item xs={12} md={6}>
-              <Stack spacing={3}>
-                <Alert severity="info" sx={{ fontSize: '0.875rem' }}>
-                  Configure export settings and preview before downloading.
-                </Alert>
+          <Stack spacing={3} sx={{ mt: 1 }}>
+            <Alert severity="info">
+              High-quality export uses Matplotlib backend with full publication styling control.
+              Configure export settings below and preview before downloading.
+            </Alert>
 
-                <FormControl fullWidth size="small">
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
                   <InputLabel>Plot Style</InputLabel>
                   <Select
                     value={matplotlibExportSettings.style}
                     label="Plot Style"
-                    onChange={(e) => {
-                      setMatplotlibExportSettings({ ...matplotlibExportSettings, style: e.target.value });
-                      setPreviewImage(null);
-                    }}
+                    onChange={(event) =>
+                      setMatplotlibExportSettings({
+                        ...matplotlibExportSettings,
+                        style: event.target.value,
+                      })
+                    }
                   >
-                    <MenuItem value="default">Default</MenuItem>
-                    <MenuItem value="publication">Publication (Recommended)</MenuItem>
-                    <MenuItem value="presentation">Presentation</MenuItem>
+                    <MenuItem value="light">Light (Publication)</MenuItem>
                     <MenuItem value="dark">Dark</MenuItem>
+                    <MenuItem value="seaborn">Seaborn</MenuItem>
                   </Select>
                 </FormControl>
-
-                <FormControl fullWidth size="small">
-                  <InputLabel>Export Format</InputLabel>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Format</InputLabel>
                   <Select
                     value={matplotlibExportSettings.format}
-                    label="Export Format"
-                    onChange={(e) => {
-                      setMatplotlibExportSettings({ ...matplotlibExportSettings, format: e.target.value });
-                    }}
+                    label="Format"
+                    onChange={(event) =>
+                      setMatplotlibExportSettings({
+                        ...matplotlibExportSettings,
+                        format: event.target.value,
+                      })
+                    }
                   >
-                    <MenuItem value="png">PNG (Raster)</MenuItem>
-                    <MenuItem value="pdf">PDF (Vector, best for papers)</MenuItem>
-                    <MenuItem value="svg">SVG (Vector, editable)</MenuItem>
+                    <MenuItem value="png">PNG</MenuItem>
+                    <MenuItem value="pdf">PDF (Vector)</MenuItem>
+                    <MenuItem value="svg">SVG (Vector)</MenuItem>
                   </Select>
                 </FormControl>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="DPI"
+                  type="number"
+                  value={matplotlibExportSettings.dpi}
+                  onChange={(event) =>
+                    setMatplotlibExportSettings({
+                      ...matplotlibExportSettings,
+                      dpi: Number(event.target.value),
+                    })
+                  }
+                  inputProps={{ min: 72, max: 600, step: 50 }}
+                  fullWidth
+                  helperText="Higher DPI = larger file size"
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Width (inches)"
+                  type="number"
+                  value={matplotlibExportSettings.figWidthInches}
+                  onChange={(event) =>
+                    setMatplotlibExportSettings({
+                      ...matplotlibExportSettings,
+                      figWidthInches: Number(event.target.value),
+                    })
+                  }
+                  inputProps={{ min: 4, max: 20, step: 0.5 }}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Height (inches)"
+                  type="number"
+                  value={matplotlibExportSettings.figHeightInches}
+                  onChange={(event) =>
+                    setMatplotlibExportSettings({
+                      ...matplotlibExportSettings,
+                      figHeightInches: Number(event.target.value),
+                    })
+                  }
+                  inputProps={{ min: 3, max: 15, step: 0.5 }}
+                  fullWidth
+                />
+              </Grid>
+            </Grid>
 
-                <FormControl fullWidth size="small">
-                  <InputLabel>DPI (Resolution)</InputLabel>
-                  <Select
-                    value={matplotlibExportSettings.dpi}
-                    label="DPI (Resolution)"
-                    onChange={(e) => {
-                      setMatplotlibExportSettings({ ...matplotlibExportSettings, dpi: Number(e.target.value) });
-                    }}
-                  >
-                    <MenuItem value={150}>150 DPI (Draft)</MenuItem>
-                    <MenuItem value={300}>300 DPI (Publication Standard)</MenuItem>
-                    <MenuItem value={600}>600 DPI (High Quality)</MenuItem>
-                    <MenuItem value={1200}>1200 DPI (Ultra High Quality)</MenuItem>
-                  </Select>
-                </FormControl>
+            {generatingPreview && (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <LinearProgress />
+                <Typography variant="body2" sx={{ mt: 2 }}>
+                  Generating preview...
+                </Typography>
+              </Box>
+            )}
 
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Export Settings
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Style: <strong>{matplotlibExportSettings.style}</strong>
-                    <br />
-                    Format: <strong>{matplotlibExportSettings.format.toUpperCase()}</strong>
-                    <br />
-                    Resolution: <strong>{matplotlibExportSettings.dpi} DPI</strong>
-                    <br />
-                    Size: <strong>
-                      {figureSettings.figWidthInches}" × {figureSettings.figHeightInches}" 
-                      ({Math.round(figureSettings.figWidthInches * matplotlibExportSettings.dpi)} × {Math.round(figureSettings.figHeightInches * matplotlibExportSettings.dpi)} px)
-                    </strong>
-                  </Typography>
+            {previewImage && !generatingPreview && (
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  Preview (responsive size: {previewImage.width}×{previewImage.height}px @ {previewImage.dpi} DPI)
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: '#f5f5f5' }}>
+                  <img
+                    src={`data:image/${previewImage.format};base64,${previewImage.base64}`}
+                    alt="Plot preview"
+                    style={{ maxWidth: '100%', height: 'auto' }}
+                  />
                 </Paper>
-              </Stack>
-            </Grid>
-
-            {/* Right side: Preview */}
-            <Grid item xs={12} md={6}>
-              <Stack spacing={2}>
-                <Typography variant="subtitle2">
-                  Preview (PNG @ 150 DPI)
-                </Typography>
-                {generatingPreview ? (
-                  <Box sx={{ 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    justifyContent: 'center', 
-                    alignItems: 'center',
-                    minHeight: 300,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    bgcolor: 'grey.50',
-                  }}>
-                    <LinearProgress sx={{ width: '60%', mb: 2 }} />
-                    <Typography variant="body2" color="text.secondary">
-                      Generating preview...
-                    </Typography>
-                  </Box>
-                ) : previewImage ? (
-                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default' }}>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'center', 
-                      alignItems: 'center',
-                      maxHeight: '400px',
-                      overflow: 'auto',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      borderRadius: 1,
-                      bgcolor: 'white',
-                      p: 1,
-                    }}>
-                      <img 
-                        src={`data:image/${previewImage.format};base64,${previewImage.base64}`}
-                        alt="Plot preview"
-                        style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
-                      />
-                    </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
-                      Preview: {previewImage.width} × {previewImage.height} px
-                    </Typography>
-                  </Paper>
-                ) : null}
-                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                  Note: This is a quick preview. The downloaded file will be generated at the selected DPI and format.
-                </Typography>
-              </Stack>
-            </Grid>
-          </Grid>
+              </Box>
+            )}
+          </Stack>
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={() => {
-              setShowMatplotlibExport(false);
-              setPreviewImage(null);
-            }} 
-            disabled={exporting}
-          >
-            Cancel
+          <Button onClick={() => setShowMatplotlibExport(false)}>Cancel</Button>
+          <Button onClick={handleGeneratePreview} disabled={generatingPreview}>
+            Refresh Preview
           </Button>
           <Button
             variant="contained"
             onClick={handleDownloadExport}
-            disabled={exporting || generatingPreview}
-            startIcon={exporting ? undefined : <DownloadIcon />}
+            disabled={exporting || seriesConfigs.length === 0}
+            startIcon={<DownloadIcon />}
           >
-            {exporting ? 'Downloading...' : `Download ${matplotlibExportSettings.format.toUpperCase()}`}
+            {exporting ? 'Exporting...' : 'Download'}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Notification Snackbar */}
+      {notification && (
+        <Alert
+          severity={notification.type}
+          onClose={() => setNotification(null)}
+          sx={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999 }}
+        >
+          {notification.message}
+        </Alert>
+      )}
     </Grid>
   );
 };

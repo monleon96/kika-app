@@ -2,9 +2,16 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
-import { ACEViewer } from './pages/ACEViewer';
-import { ENDFViewer } from './pages/ENDFViewer';
+import { ACEFiles } from './pages/ACEFiles';
+import { ACEFilePage } from './pages/ACEFilePage';
+import { ACEPlotter } from './pages/ACEPlotter';
+import { ACEDataSection } from './pages/ACEDataSection';
+import { ENDFFiles } from './pages/ENDFFiles';
+import { ENDFFilePage } from './pages/ENDFFilePage';
+import { ENDFPlotter } from './pages/ENDFPlotter';
+import { ENDFDataSection } from './pages/ENDFDataSection';
 import { Settings } from './pages/Settings';
+import { FileManager } from './pages/FileManager';
 import { useAuth } from './contexts/AuthContext';
 
 // Protected route wrapper
@@ -36,10 +43,16 @@ export const AppRoutes: React.FC = () => {
         }
       >
         <Route index element={<Home />} />
-        <Route path="ace-viewer" element={<ACEViewer />} />
-        <Route path="endf-viewer" element={<ENDFViewer />} />
+        <Route path="files" element={<FileManager />} />
+        <Route path="ace-files" element={<ACEFiles />} />
+        <Route path="ace-files/plotter" element={<ACEPlotter />} />
+        <Route path="ace-files/:fileId" element={<ACEFilePage />} />
+        <Route path="ace-files/:fileId/:section" element={<ACEDataSection />} />
+        <Route path="endf-files" element={<ENDFFiles />} />
+        <Route path="endf-files/plotter" element={<ENDFPlotter />} />
+        <Route path="endf-files/:fileId" element={<ENDFFilePage />} />
+        <Route path="endf-files/:fileId/:section" element={<ENDFDataSection />} />
         <Route path="settings" element={<Settings />} />
-        {/* More routes will be added here as we migrate pages */}
       </Route>
     </Routes>
   );
