@@ -15,13 +15,13 @@ import {
   Alert,
 } from '@mui/material';
 import {
-  Info,
   CheckCircle,
   Error as ErrorIcon,
   Refresh,
   ContentCopy,
 } from '@mui/icons-material';
 import { getDiagnosticInfo, DiagnosticInfo } from '../services/updateService';
+import kikaIcon from '@assets/icon_kika_128.png';
 
 interface AboutDialogProps {
   open: boolean;
@@ -93,7 +93,7 @@ Core Backend:
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Info />
+        <img src={kikaIcon} alt="KIKA" style={{ height: 24 }} />
         About KIKA
       </DialogTitle>
       <DialogContent>
@@ -104,7 +104,8 @@ Core Backend:
         ) : diagnostics ? (
           <>
             <Box sx={{ textAlign: 'center', mb: 3 }}>
-              <Typography variant="h4">⚛️ KIKA</Typography>
+              <img src={kikaIcon} alt="KIKA" style={{ height: 64, marginBottom: 8 }} />
+              <Typography variant="h4">KIKA</Typography>
               <Typography variant="subtitle1" color="text.secondary">
                 Nuclear Data Visualization Tool
               </Typography>

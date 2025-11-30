@@ -24,9 +24,13 @@ async def export_with_matplotlib(request: MatplotlibExportRequest):
     try:
         fig_settings = request.figure_settings
         
-        # Extract figure size
-        fig_width = fig_settings.get('width', 900) / 100  # Convert px to inches (assuming 100 dpi)
-        fig_height = fig_settings.get('height', 580) / 100
+        # Support both figWidthInches/figHeightInches (from frontend) and width/height (legacy)
+        if 'figWidthInches' in fig_settings:
+            fig_width = fig_settings.get('figWidthInches', 8)
+            fig_height = fig_settings.get('figHeightInches', 5)
+        else:
+            fig_width = fig_settings.get('width', 900) / 100  # Convert px to inches (assuming 100 dpi)
+            fig_height = fig_settings.get('height', 580) / 100
         
         # Create PlotBuilder with style
         builder = PlotBuilder(
@@ -178,8 +182,13 @@ async def export_endf_with_matplotlib(request: ENDFMatplotlibExportRequest):
 
     try:
         fig_settings = request.figure_settings
-        fig_width = fig_settings.get('width', 900) / 100
-        fig_height = fig_settings.get('height', 580) / 100
+        # Support both figWidthInches/figHeightInches (from frontend) and width/height (legacy)
+        if 'figWidthInches' in fig_settings:
+            fig_width = fig_settings.get('figWidthInches', 8)
+            fig_height = fig_settings.get('figHeightInches', 5)
+        else:
+            fig_width = fig_settings.get('width', 900) / 100
+            fig_height = fig_settings.get('height', 580) / 100
 
         builder = PlotBuilder(
             style=request.style,

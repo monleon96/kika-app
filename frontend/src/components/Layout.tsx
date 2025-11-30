@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Box, AppBar, Toolbar, Typography, IconButton, Button, Badge } from '@mui/material';
-import { Logout, Home as HomeIcon, Folder, FolderOpen, Info, Settings } from '@mui/icons-material';
+import { Box, AppBar, Toolbar, Typography, IconButton, Button, Badge, Tooltip } from '@mui/material';
+import { Logout, Home as HomeIcon, Folder, FolderOpen, Info, Settings, FolderCopy } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
 import { FileWorkspace } from './FileWorkspace';
 import { AboutDialog } from './AboutDialog';
+import kikaIcon from '@assets/icon_kika_128.png';
 
-const WORKSPACE_WIDTH = 400;
+const WORKSPACE_WIDTH = 360;
 
 export const Layout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -23,75 +24,104 @@ export const Layout: React.FC = () => {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
-          <IconButton
-            color="inherit"
-            onClick={() => setWorkspaceOpen(!workspaceOpen)}
-            title="Toggle File Workspace"
-            sx={{ mr: 2 }}
-          >
-            <Badge badgeContent={fileCount} color="secondary">
-              {workspaceOpen ? <FolderOpen /> : <Folder />}
-            </Badge>
-          </IconButton>
+          <Tooltip title="Quick File Access">
+            <IconButton
+              color="inherit"
+              onClick={() => setWorkspaceOpen(!workspaceOpen)}
+              sx={{ mr: 1 }}
+            >
+              <Badge badgeContent={fileCount} color="secondary">
+                {workspaceOpen ? <FolderOpen /> : <Folder />}
+              </Badge>
+            </IconButton>
+          </Tooltip>
 
-          <IconButton
-            color="inherit"
+          <Tooltip title="Home">
+            <IconButton
+              color="inherit"
+              onClick={() => navigate('/')}
+              sx={{ mr: 1 }}
+            >
+              <HomeIcon />
+            </IconButton>
+          </Tooltip>
+
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              cursor: 'pointer',
+              mr: 2,
+            }}
             onClick={() => navigate('/')}
-            title="Home"
-            sx={{ mr: 2 }}
           >
-            <HomeIcon />
-          </IconButton>
+            <img src={kikaIcon} alt="KIKA" style={{ height: 32, marginRight: 8 }} />
+            <Typography variant="h6" component="div" sx={{ display: { xs: 'none', sm: 'block' } }}>
+              KIKA
+            </Typography>
+          </Box>
 
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            ⚛️ KIKA
-          </Typography>
+          <Box sx={{ flexGrow: 1, display: 'flex', gap: 0.5 }}>
+            <Button
+              color="inherit"
+              startIcon={<FolderCopy />}
+              onClick={() => navigate('/files')}
+              sx={{
+                bgcolor: location.pathname === '/files' ? 'rgba(255,255,255,0.15)' : 'transparent',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+              }}
+            >
+              Files
+            </Button>
+            <Button
+              color="inherit"
+              onClick={() => navigate('/ace-files')}
+              sx={{
+                bgcolor: location.pathname.startsWith('/ace-files') ? 'rgba(255,255,255,0.15)' : 'transparent',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+              }}
+            >
+              ACE Files
+            </Button>
+            <Button
+              color="inherit"
+              onClick={() => navigate('/endf-files')}
+              sx={{
+                bgcolor: location.pathname.startsWith('/endf-files') ? 'rgba(255,255,255,0.15)' : 'transparent',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+              }}
+            >
+              ENDF Files
+            </Button>
+          </Box>
 
-          <Button
-            color="inherit"
-            onClick={() => navigate('/ace-viewer')}
-            sx={{
-              mr: 1,
-              bgcolor: location.pathname === '/ace-viewer' ? 'rgba(255,255,255,0.1)' : 'transparent',
-            }}
-          >
-            📊 ACE Viewer
-          </Button>
-          <Button
-            color="inherit"
-            onClick={() => navigate('/endf-viewer')}
-            sx={{
-              mr: 1,
-              bgcolor: location.pathname === '/endf-viewer' ? 'rgba(255,255,255,0.1)' : 'transparent',
-            }}
-          >
-            📈 ENDF Viewer
-          </Button>
-
-          <Typography variant="body2" sx={{ mr: 2 }}>
+          <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', md: 'block' } }}>
             {user?.is_guest ? '🚀 Guest' : user?.email}
           </Typography>
-          <IconButton
-            color="inherit"
-            onClick={() => navigate('/settings')}
-            title="Settings"
-          >
-            <Settings />
-          </IconButton>
-          <IconButton
-            color="inherit"
-            onClick={() => setAboutOpen(true)}
-            title="About KIKA"
-          >
-            <Info />
-          </IconButton>
-          <IconButton 
-            color="inherit" 
-            onClick={logout} 
-            title={user?.is_guest ? 'Exit Guest Mode' : 'Logout'}
-          >
-            <Logout />
-          </IconButton>
+          <Tooltip title="Settings">
+            <IconButton
+              color="inherit"
+              onClick={() => navigate('/settings')}
+            >
+              <Settings />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="About KIKA">
+            <IconButton
+              color="inherit"
+              onClick={() => setAboutOpen(true)}
+            >
+              <Info />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={user?.is_guest ? 'Exit Guest Mode' : 'Logout'}>
+            <IconButton 
+              color="inherit" 
+              onClick={logout}
+            >
+              <Logout />
+            </IconButton>
+          </Tooltip>
         </Toolbar>
       </AppBar>
       

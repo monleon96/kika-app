@@ -13,7 +13,8 @@ export type FileStatus = 'pending' | 'parsing' | 'ready' | 'error';
  */
 export interface WorkspaceFile {
   id: string;
-  name: string;
+  name: string;           // Original filename
+  displayName: string;    // User-editable display name
   path: string;
   content: string;
   type: FileType | null;
