@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -35,8 +35,15 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [currentVersion, setCurrentVersion] = useState<string>('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  
+  // Prevent duplicate checks in React 18 StrictMode
+  const hasChecked = useRef(false);
 
   useEffect(() => {
+    // Guard against double execution in StrictMode
+    if (hasChecked.current) return;
+    hasChecked.current = true;
+    
     const init = async () => {
       // Get current version
       const version = await getAppVersion();

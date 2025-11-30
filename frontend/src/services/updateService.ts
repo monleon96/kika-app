@@ -157,11 +157,19 @@ export async function installUpdateAndRestart(): Promise<void> {
     throw new Error('Updates only available in Tauri');
   }
 
-  const { installUpdate } = await import('@tauri-apps/api/updater');
-  const { relaunch } = await import('@tauri-apps/api/process');
+  try {
+    console.log('[Updater] Starting update installation...');
+    const { installUpdate } = await import('@tauri-apps/api/updater');
+    const { relaunch } = await import('@tauri-apps/api/process');
 
-  await installUpdate();
-  await relaunch();
+    console.log('[Updater] Calling installUpdate()...');
+    await installUpdate();
+    console.log('[Updater] Update installed, relaunching...');
+    await relaunch();
+  } catch (error) {
+    console.error('[Updater] Failed to install update:', error);
+    throw error;
+  }
 }
 
 /**
