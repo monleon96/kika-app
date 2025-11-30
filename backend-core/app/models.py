@@ -98,6 +98,91 @@ class ENDFSeriesRequest(BaseModel):
     """Request for ENDF plotting data"""
     file_id: Optional[str] = None
     file_content: Optional[str] = None
+
+
+# ============================================================================
+# Materials Models
+# ============================================================================
+
+class NuclideData(BaseModel):
+    """Schema for a single nuclide in a material"""
+    zaid: int
+    fraction: float
+    nlib: Optional[str] = None
+    plib: Optional[str] = None
+    ylib: Optional[str] = None
+
+
+class MaterialData(BaseModel):
+    """Schema for material data"""
+    material_id: int
+    nlib: Optional[str] = None
+    plib: Optional[str] = None
+    ylib: Optional[str] = None
+    nuclides: List[NuclideData] = []
+
+
+class ParseMCNPRequest(BaseModel):
+    """Request to parse MCNP materials from input content"""
+    file_content: str
+    file_name: Optional[str] = "input.txt"
+
+
+class ParseMCNPResponse(BaseModel):
+    """Response with parsed materials"""
+    materials: List[MaterialData]
+    count: int
+
+
+class MaterialConvertRequest(BaseModel):
+    """Request to convert material fractions"""
+    material: MaterialData
+
+
+class MaterialConvertResponse(BaseModel):
+    """Response with converted material"""
+    material: MaterialData
+
+
+class ExpandNaturalRequest(BaseModel):
+    """Request to expand natural elements in a material"""
+    material: MaterialData
+    zaids_to_expand: Optional[List[int]] = None
+
+
+class MaterialExportRequest(BaseModel):
+    """Request to export material to MCNP format"""
+    material: MaterialData
+
+
+class MaterialExportResponse(BaseModel):
+    """Response with MCNP formatted string"""
+    mcnp_text: str
+
+
+class MaterialInfoResponse(BaseModel):
+    """Response with material analysis"""
+    material_id: int
+    nuclide_count: int
+    fraction_type: str  # 'weight' or 'atomic'
+    natural_element_count: int
+    natural_elements: List[int]
+    unique_elements: List[int]
+    has_libraries: bool
+
+
+class AddNuclideRequest(BaseModel):
+    """Request to add a nuclide to a material"""
+    material: MaterialData
+    zaid: int
+    fraction: float
+    library: Optional[str] = None
+
+
+class RemoveNuclideRequest(BaseModel):
+    """Request to remove a nuclide from a material"""
+    material: MaterialData
+    zaid: int
     file_name: str
     data_type: str  # 'angular' or 'uncertainty'
     mt_number: int

@@ -107,7 +107,7 @@
         "wix": null,
         "nsis": {
           "license": null,
-          "installerIcon": null,
+          "installerIcon": "icons/icon.ico",
           "headerImage": null,
           "sidebarImage": null,
           "installMode": "currentUser",

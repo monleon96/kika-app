@@ -88,3 +88,4 @@ class AdminListUsersResponse(BaseModel):
 class AdminListEventsResponse(BaseModel):
     items: List[AdminEvent]
     count: int
+

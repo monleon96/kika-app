@@ -10,6 +10,13 @@ echo "KIKA Development Server"
 echo "========================================"
 echo ""
 
+# Kill any existing processes on development ports (for safety)
+echo "Cleaning up any existing processes on ports 8000, 8001, 1420..."
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+lsof -ti:8001 | xargs kill -9 2>/dev/null || true
+lsof -ti:1420 | xargs kill -9 2>/dev/null || true
+sleep 1
+
 # Check if venv exists
 if [ ! -d "venv" ]; then
     echo "Error: Virtual environment not found. Run ./setup_workspace.sh first."

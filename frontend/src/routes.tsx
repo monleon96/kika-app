@@ -10,6 +10,9 @@ import { ENDFFiles } from './pages/ENDFFiles';
 import { ENDFFilePage } from './pages/ENDFFilePage';
 import { ENDFPlotter } from './pages/ENDFPlotter';
 import { ENDFDataSection } from './pages/ENDFDataSection';
+import { Materials } from './pages/Materials';
+import { MaterialDetail } from './pages/MaterialDetail';
+import { MaterialEditor } from './pages/MaterialEditor';
 import { Settings } from './pages/Settings';
 import { FileManager } from './pages/FileManager';
 import { useAuth } from './contexts/AuthContext';
@@ -52,6 +55,10 @@ export const AppRoutes: React.FC = () => {
         <Route path="endf-files/plotter" element={<ENDFPlotter />} />
         <Route path="endf-files/:fileId" element={<ENDFFilePage />} />
         <Route path="endf-files/:fileId/:section" element={<ENDFDataSection />} />
+        <Route path="materials" element={<Materials />} />
+        <Route path="materials/create" element={<MaterialEditor />} />
+        <Route path="materials/import" element={<MaterialEditor />} />
+        <Route path="materials/:materialId" element={<MaterialDetail />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

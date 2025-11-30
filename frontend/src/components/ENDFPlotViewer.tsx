@@ -1765,49 +1765,32 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files, onReuploa
             );
           })}
 
-          {/* Figure Settings Panel */}
-          <Paper 
-            elevation={0}
-            sx={{ 
-              p: 3,
-              borderRadius: 3,
-              border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6" fontWeight={600}>
-                Figure Settings
-              </Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<RefreshIcon fontSize="small" />}
-                onClick={() => setFigureSettings(getDefaultFigureSettings())}
-                sx={{ borderRadius: 2 }}
-              >
-                Reset
-              </Button>
-            </Box>
-
-            {/* Labels, Title & Legend */}
-            <Accordion 
-              defaultExpanded
-              elevation={0}
-              sx={{ 
-                '&:before': { display: 'none' },
-                bgcolor: alpha(theme.palette.background.default, 0.5),
-                borderRadius: '8px !important',
-                mb: 1,
-              }}
+          {/* Figure Settings Header */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, mt: 1 }}>
+            <Typography variant="h6" fontWeight={600}>
+              ⚙️ Figure Settings
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<RefreshIcon fontSize="small" />}
+              onClick={() => setFigureSettings(getDefaultFigureSettings())}
+              sx={{ borderRadius: 2 }}
             >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1" fontWeight={500}>Labels & Legend</Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ p: 2 }}>
-                <Stack spacing={2}>
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={9}>
-                      <TextField
+              Reset
+            </Button>
+          </Box>
+
+          {/* Labels, Title & Legend */}
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle1">🏷️ Labels, Title & Legend</Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 2 }}>
+              <Stack spacing={2}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={9}>
+                    <TextField
                         label="Title"
                         value={figureSettings.title}
                         onChange={(event) => setFigureSettings({ ...figureSettings, title: event.target.value })}
@@ -1901,50 +1884,41 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files, onReuploa
               </AccordionDetails>
             </Accordion>
 
-            {/* Zoom, Scales & Grid */}
-            <Accordion 
-              defaultExpanded
-              elevation={0}
-              sx={{ 
-                '&:before': { display: 'none' },
-                bgcolor: alpha(theme.palette.background.default, 0.5),
-                borderRadius: '8px !important',
-                mb: 1,
-              }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1" fontWeight={500}>Scales & Grid</Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ p: 2 }}>
-                <Stack spacing={2}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={500}>Axis Limits</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">X-axis Range</Typography>
-                      <Grid container spacing={1} sx={{ mt: 0.5 }}>
-                        <Grid item xs={6}>
-                          <TextField
-                            label="Min"
-                            placeholder="auto"
-                            value={figureSettings.xMin}
-                            onChange={(event) => setFigureSettings({ ...figureSettings, xMin: event.target.value })}
-                            fullWidth
-                            size="small"
-                          />
-                        </Grid>
-                        <Grid item xs={6}>
-                          <TextField
-                            label="Max"
-                            placeholder="auto"
-                            value={figureSettings.xMax}
-                            onChange={(event) => setFigureSettings({ ...figureSettings, xMax: event.target.value })}
-                            fullWidth
-                            size="small"
-                          />
-                        </Grid>
+          {/* Zoom, Scales & Grid */}
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle1">🔍 Zoom, Scales & Grid</Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 2 }}>
+              <Stack spacing={2}>
+                <Typography variant="subtitle2">🔍 Zoom / Axis Limits</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">X-axis Range</Typography>
+                    <Grid container spacing={1} sx={{ mt: 0.5 }}>
+                      <Grid item xs={6}>
+                        <TextField
+                          label="Min"
+                          placeholder="auto"
+                          value={figureSettings.xMin}
+                          onChange={(event) => setFigureSettings({ ...figureSettings, xMin: event.target.value })}
+                          fullWidth
+                          size="small"
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <TextField
+                          label="Max"
+                          placeholder="auto"
+                          value={figureSettings.xMax}
+                          onChange={(event) => setFigureSettings({ ...figureSettings, xMax: event.target.value })}
+                          fullWidth
+                          size="small"
+                        />
                       </Grid>
                     </Grid>
-                    <Grid item xs={6}>
+                  </Grid>
+                  <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Y-axis Range</Typography>
                       <Grid container spacing={1} sx={{ mt: 0.5 }}>
                         <Grid item xs={6}>
@@ -2054,95 +2028,93 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files, onReuploa
                       )}
                     </Box>
                   )}
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
 
-            {/* Advanced: Tick Parameters */}
-            <Accordion
-              elevation={0}
-              sx={{ 
-                '&:before': { display: 'none' },
-                bgcolor: alpha(theme.palette.background.default, 0.5),
-                borderRadius: '8px !important',
-              }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1" fontWeight={500}>Advanced Settings</Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ p: 2 }}>
-                <Stack spacing={2}>
-                  <Typography variant="subtitle2">X-axis Ticks</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Font Size"
-                        type="number"
-                        value={figureSettings.tickFontSizeX}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, tickFontSizeX: Number(event.target.value) })}
-                        inputProps={{ min: 6, max: 20, step: 1 }}
-                        fullWidth
-                      />
-                    </Grid>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Max Ticks"
-                        type="number"
-                        value={figureSettings.maxTicksX}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, maxTicksX: Number(event.target.value) })}
-                        inputProps={{ min: 3, max: 20, step: 1 }}
-                        fullWidth
-                      />
-                    </Grid>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Rotation (°)"
-                        type="number"
-                        value={figureSettings.rotateTicksX}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, rotateTicksX: Number(event.target.value) })}
-                        inputProps={{ min: 0, max: 90, step: 15 }}
-                        fullWidth
-                      />
-                    </Grid>
+          {/* Tick Labels */}
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle1">🔢 Tick Labels</Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 2 }}>
+              <Stack spacing={2}>
+                <Typography variant="subtitle2">X-axis Ticks</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={4}>
+                    <TextField
+                      label="Font Size"
+                      type="number"
+                      value={figureSettings.tickFontSizeX}
+                      onChange={(event) => setFigureSettings({ ...figureSettings, tickFontSizeX: Number(event.target.value) })}
+                      inputProps={{ min: 6, max: 20, step: 1 }}
+                      fullWidth
+                      size="small"
+                    />
                   </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      label="Max Ticks"
+                      type="number"
+                      value={figureSettings.maxTicksX}
+                      onChange={(event) => setFigureSettings({ ...figureSettings, maxTicksX: Number(event.target.value) })}
+                      inputProps={{ min: 3, max: 20, step: 1 }}
+                      fullWidth
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      label="Rotation (°)"
+                      type="number"
+                      value={figureSettings.rotateTicksX}
+                      onChange={(event) => setFigureSettings({ ...figureSettings, rotateTicksX: Number(event.target.value) })}
+                      inputProps={{ min: 0, max: 90, step: 15 }}
+                      fullWidth
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
 
-                  <Typography variant="subtitle2" sx={{ mt: 1 }}>Y-axis Ticks</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Font Size"
-                        type="number"
-                        value={figureSettings.tickFontSizeY}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, tickFontSizeY: Number(event.target.value) })}
-                        inputProps={{ min: 6, max: 20, step: 1 }}
-                        fullWidth
-                      />
-                    </Grid>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Max Ticks"
-                        type="number"
-                        value={figureSettings.maxTicksY}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, maxTicksY: Number(event.target.value) })}
-                        inputProps={{ min: 3, max: 20, step: 1 }}
-                        fullWidth
-                      />
-                    </Grid>
-                    <Grid item xs={4}>
-                      <TextField
-                        label="Rotation (°)"
-                        type="number"
-                        value={figureSettings.rotateTicksY}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, rotateTicksY: Number(event.target.value) })}
-                        inputProps={{ min: 0, max: 90, step: 15 }}
-                        fullWidth
-                      />
-                    </Grid>
+                <Typography variant="subtitle2" sx={{ mt: 2 }}>Y-axis Ticks</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={4}>
+                    <TextField
+                      label="Font Size"
+                      type="number"
+                      value={figureSettings.tickFontSizeY}
+                      onChange={(event) => setFigureSettings({ ...figureSettings, tickFontSizeY: Number(event.target.value) })}
+                      inputProps={{ min: 6, max: 20, step: 1 }}
+                      fullWidth
+                      size="small"
+                    />
                   </Grid>
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
-          </Paper>
+                  <Grid item xs={4}>
+                    <TextField
+                      label="Max Ticks"
+                      type="number"
+                      value={figureSettings.maxTicksY}
+                      onChange={(event) => setFigureSettings({ ...figureSettings, maxTicksY: Number(event.target.value) })}
+                      inputProps={{ min: 3, max: 20, step: 1 }}
+                      fullWidth
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      label="Rotation (°)"
+                      type="number"
+                      value={figureSettings.rotateTicksY}
+                      onChange={(event) => setFigureSettings({ ...figureSettings, rotateTicksY: Number(event.target.value) })}
+                      inputProps={{ min: 0, max: 90, step: 15 }}
+                      fullWidth
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
 
           {/* Saved Configurations Panel */}
           <Paper 
