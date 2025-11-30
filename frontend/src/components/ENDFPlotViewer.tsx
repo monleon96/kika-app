@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Plot from 'react-plotly.js';
 import Plotly from 'plotly.js-dist-min';
 import type {
@@ -14,9 +14,9 @@ import {
   AccordionDetails,
   AccordionSummary,
   Alert,
+  alpha,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -38,6 +38,8 @@ import {
   ToggleButtonGroup,
   Tooltip,
   Typography,
+  useTheme,
+  CircularProgress,
 } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
@@ -48,10 +50,16 @@ import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import HighQualityIcon from '@mui/icons-material/HighQuality';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import ImageIcon from '@mui/icons-material/Image';
+import AutoGraphIcon from '@mui/icons-material/AutoGraph';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import {
   fetchENDFSeries,
   exportENDFWithMatplotlib,
+  getENDFMatplotlibPreview,
   type ENDFSeriesResponse,
+  type MatplotlibExportResponse,
 } from '../services/kikaService';
 import type { ENDFMetadata } from '../types/file';
 
@@ -169,6 +177,7 @@ export interface LoadedENDFFile {
   path: string;
   content: string;
   metadata?: ENDFMetadata;
+  needsReupload?: boolean; // True if content is empty after session restore
 }
 
 const createSeriesId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -282,6 +291,7 @@ const legendPositionMap: Record<
 
 interface ENDFPlotViewerProps {
   files: LoadedENDFFile[];
+  onReuploadFile?: (fileId: string) => void;
 }
 
 const formatTimestamp = (iso: string) => {
@@ -289,7 +299,11 @@ const formatTimestamp = (iso: string) => {
   return date.toLocaleString();
 };
 
-export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
+// Preview mode type
+type PreviewMode = 'matplotlib' | 'plotly';
+
+export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files, onReuploadFile }) => {
+  const theme = useTheme();
   const [dataMode, setDataMode] = useState<DataMode>('angular');
   const [figureSettings, setFigureSettings] = useState<FigureSettings>(() => getDefaultFigureSettings());
   const [seriesConfigs, setSeriesConfigs] = useState<SeriesConfig[]>([]);
@@ -299,7 +313,7 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
   // Do NOT persist saved configs - they should be session-only
   const [savedConfigs, setSavedConfigs] = useState<SavedPlotConfig[]>([]);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [matplotlibExportSettings, setMatplotlibExportSettings] = useState({ style: 'publication', format: 'png', dpi: 300 });
+  const [matplotlibExportSettings, setMatplotlibExportSettings] = useState({ style: 'light', format: 'png', dpi: 300, figWidthInches: 8, figHeightInches: 5 });
   const [previewImage, setPreviewImage] = useState<{
     base64: string;
     format: string;
@@ -311,6 +325,14 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
   const [exporting, setExporting] = useState(false);
   const [exportOptions] = useState({ format: 'png', width: 1200, height: 720, scale: 2 });
   const plotRef = useRef<PlotlyHTMLElement | null>(null);
+  
+  // New state for matplotlib live preview
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('matplotlib');
+  const [livePreviewImage, setLivePreviewImage] = useState<MatplotlibExportResponse | null>(null);
+  const [livePreviewLoading, setLivePreviewLoading] = useState(false);
+  const [livePreviewError, setLivePreviewError] = useState<string | null>(null);
+  const livePreviewRequestIdRef = useRef(0);
+  const previewDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clean up any legacy localStorage on mount
   useEffect(() => {
@@ -842,6 +864,118 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
     setSavedConfigs((prev) => prev.filter((cfg) => cfg.id !== configId));
   };
 
+  // Generate live matplotlib preview with debouncing
+  const generateLivePreview = useCallback(async () => {
+    // Check if all series have their data loaded
+    const allSeriesReady = seriesConfigs.every(series => {
+      const state = seriesDataMap[series.id];
+      return state && state.status === 'ready';
+    });
+    
+    if (seriesConfigs.length === 0 || !allSeriesReady) {
+      setLivePreviewImage(null);
+      return;
+    }
+
+    const requestId = Date.now();
+    livePreviewRequestIdRef.current = requestId;
+    setLivePreviewLoading(true);
+    setLivePreviewError(null);
+    
+    try {
+      const exportData = {
+        series: seriesConfigs
+          .filter((series) => series.mtNumber !== undefined)
+          .map((series) => {
+            const file = files.find(f => f.name === series.fileName);
+            return {
+              file_name: series.fileName,
+              file_id: series.fileId,
+              file_content: file?.content,
+              data_type: dataMode,
+              mt_number: series.mtNumber!,
+              order: series.order,
+              include_uncertainty: dataMode === 'angular' ? series.includeUncertainty : false,
+              sigma: series.sigma,
+              color: series.color,
+              lineWidth: series.lineWidth,
+              lineStyle: series.lineStyle,
+              showMarkers: series.showMarkers,
+              markerSymbol: String(series.markerSymbol || 'circle'),
+              markerSize: series.markerSize,
+              labelMode: series.labelMode,
+              customLabel: series.customLabel,
+            };
+          }),
+        figure_settings: {
+          title: figureSettings.title,
+          xLabel: figureSettings.xLabel,
+          yLabel: figureSettings.yLabel,
+          logX: figureSettings.logX,
+          logY: figureSettings.logY,
+          xMin: figureSettings.xMin,
+          xMax: figureSettings.xMax,
+          yMin: figureSettings.yMin,
+          yMax: figureSettings.yMax,
+          showGrid: figureSettings.showGrid,
+          gridAlpha: figureSettings.gridAlpha,
+          showMinorGrid: figureSettings.showMinorGrid,
+          minorGridAlpha: figureSettings.minorGridAlpha,
+          showLegend: figureSettings.showLegend,
+          legendPosition: figureSettings.legendPosition,
+          figWidthInches: 10, // Fixed responsive size for live preview
+          figHeightInches: 6,
+          titleFontSize: figureSettings.titleFontSize,
+          labelFontSize: figureSettings.labelFontSize,
+          legendFontSize: figureSettings.legendFontSize,
+          tickFontSizeX: figureSettings.tickFontSizeX,
+          tickFontSizeY: figureSettings.tickFontSizeY,
+          maxTicksX: figureSettings.maxTicksX,
+          maxTicksY: figureSettings.maxTicksY,
+          rotateTicksX: figureSettings.rotateTicksX,
+          rotateTicksY: figureSettings.rotateTicksY,
+        },
+        style: matplotlibExportSettings.style,
+        dpi: 80, // Lower DPI for faster preview
+      };
+      
+      const result = await getENDFMatplotlibPreview(exportData);
+      if (livePreviewRequestIdRef.current === requestId) {
+        setLivePreviewImage(result);
+      }
+    } catch (error) {
+      console.error('[ENDFPlotViewer] Live preview failed:', error);
+      if (livePreviewRequestIdRef.current === requestId) {
+        setLivePreviewError(error instanceof Error ? error.message : 'Failed to generate preview');
+      }
+    } finally {
+      if (livePreviewRequestIdRef.current === requestId) {
+        setLivePreviewLoading(false);
+      }
+    }
+  }, [seriesConfigs, seriesDataMap, files, dataMode, figureSettings, matplotlibExportSettings.style]);
+
+  // Debounced live preview update
+  useEffect(() => {
+    if (previewMode !== 'matplotlib') return;
+    
+    // Clear existing timeout
+    if (previewDebounceRef.current) {
+      clearTimeout(previewDebounceRef.current);
+    }
+    
+    // Set new debounced call with short delay for responsive updates
+    previewDebounceRef.current = setTimeout(() => {
+      generateLivePreview();
+    }, 350); // Slightly slower debounce to keep updates smooth without constant loading
+    
+    return () => {
+      if (previewDebounceRef.current) {
+        clearTimeout(previewDebounceRef.current);
+      }
+    };
+  }, [previewMode, generateLivePreview]);
+
   const prepareExportData = () => ({
     series: seriesConfigs
       .filter((series) => series.mtNumber !== undefined)
@@ -883,8 +1017,8 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
       minorGridAlpha: figureSettings.minorGridAlpha,
       showLegend: figureSettings.showLegend,
       legendPosition: figureSettings.legendPosition,
-      figWidthInches: figureSettings.figWidthInches,
-      figHeightInches: figureSettings.figHeightInches,
+      figWidthInches: matplotlibExportSettings.figWidthInches,
+      figHeightInches: matplotlibExportSettings.figHeightInches,
       titleFontSize: figureSettings.titleFontSize,
       labelFontSize: figureSettings.labelFontSize,
       legendFontSize: figureSettings.legendFontSize,
@@ -907,11 +1041,7 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
     }
     setGeneratingPreview(true);
     try {
-      const exportData = {
-        ...prepareExportData(),
-        export_format: 'png',
-        dpi: 150,
-      };
+      const exportData = { ...prepareExportData(), export_format: 'png' };
       console.log('[ENDFPlotViewer] Generating preview with data:', {
         seriesCount: exportData.series.length,
         style: exportData.style,
@@ -1012,59 +1142,106 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
   // Regenerate preview when plot style changes
   useEffect(() => {
     if (exportDialogOpen && !generatingPreview) {
-      setPreviewImage(null);
       handleGeneratePreview();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matplotlibExportSettings.style]);
 
   const disableAddSeries = files.length === 0;
+  const exportPreviewScale = previewImage
+    ? Math.min(1, 900 / previewImage.width, 700 / previewImage.height)
+    : 1;
+  const exportPreviewWidth = previewImage ? Math.round(previewImage.width * exportPreviewScale) : 0;
+  const exportPreviewHeight = previewImage ? Math.round(previewImage.height * exportPreviewScale) : 0;
 
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} lg={4}>
         <Stack spacing={3}>
-          <Paper sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Alert severity="info" sx={{ mb: 1 }}>
-              <Typography variant="body2">
-                <strong>⚙️ Server Required:</strong> Ensure the KIKA processing server is running on <code>localhost:8001</code>
-                <br />
-                <Typography variant="caption" component="span">
-                  Run: <code>python kika_server/app.py</code> in the KIKA directory
-                </Typography>
-              </Typography>
-            </Alert>
+          {/* Data Mode & Add Series Panel */}
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 3, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 2.5,
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+              position: 'relative',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 3,
+                background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                borderRadius: '12px 12px 0 0',
+              },
+            }}
+          >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography variant="h6">🧮 Data Mode</Typography>
-              <Tooltip title="Reload data">
-                <IconButton onClick={() => setSeriesDataMap({})}>
+              <Typography variant="h6" fontWeight={600}>
+                Data Configuration
+              </Typography>
+              <Tooltip title="Reload all data">
+                <IconButton 
+                  onClick={() => setSeriesDataMap({})}
+                  size="small"
+                  sx={{ 
+                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
+                  }}
+                >
                   <RefreshIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             </Box>
-            <ToggleButtonGroup
-              value={dataMode}
-              exclusive
-              fullWidth
-              onChange={(_event, value) => {
-                if (value) {
-                  setDataMode(value);
-                }
-              }}
-            >
-              {DATA_MODE_OPTIONS.map((option) => (
-                <ToggleButton key={option.value} value={option.value} sx={{ textTransform: 'none' }}>
-                  {option.label}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-            <Stack direction="row" spacing={1}>
+            
+            {/* Data Mode Toggle */}
+            <Box>
+              <Typography variant="caption" color="text.secondary" fontWeight={500} sx={{ mb: 1, display: 'block' }}>
+                Data Type
+              </Typography>
+              <ToggleButtonGroup
+                value={dataMode}
+                exclusive
+                fullWidth
+                onChange={(_event, value) => {
+                  if (value) {
+                    setDataMode(value);
+                  }
+                }}
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    textTransform: 'none',
+                    py: 1,
+                    fontWeight: 500,
+                  },
+                }}
+              >
+                {DATA_MODE_OPTIONS.map((option) => (
+                  <ToggleButton key={option.value} value={option.value}>
+                    {option.label}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Box>
+            
+            {/* Action Buttons */}
+            <Stack direction="row" spacing={1.5}>
               <Button
                 variant="contained"
                 startIcon={<AddCircleOutlineIcon />}
                 onClick={handleAddSeries}
                 disabled={disableAddSeries}
                 fullWidth
+                sx={{ 
+                  py: 1.2,
+                  borderRadius: 2,
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
+                }}
               >
                 Add Series
               </Button>
@@ -1072,26 +1249,36 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
                 variant="outlined"
                 color="error"
                 onClick={handleClearSeries}
-                fullWidth
+                disabled={seriesConfigs.length === 0}
+                sx={{ 
+                  py: 1.2,
+                  borderRadius: 2,
+                  minWidth: 100,
+                }}
               >
-                Clear All
+                Clear
               </Button>
             </Stack>
+            
+            {/* Status Alerts */}
             {files.length === 0 ? (
-              <Alert severity="info">
-                Upload ENDF files in the File Workspace (📁) to get started.
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                Upload ENDF files in the File Workspace to get started.
               </Alert>
             ) : files.filter((f) => getAvailableMts(f, dataMode).length > 0).length === 0 ? (
-              <Alert severity="warning">
+              <Alert severity="warning" sx={{ borderRadius: 2 }}>
                 <strong>No compatible files loaded.</strong>
                 <br />
-                {dataMode === 'angular'
-                  ? 'None of the loaded ENDF files contain MF4 (angular distribution) data. Please upload files with MF4 sections or switch to Uncertainty mode if your files have MF34 data.'
-                  : 'None of the loaded ENDF files contain MF34 (uncertainty/covariance) data. Please upload files with MF34 sections or switch to Angular Distributions mode if your files have MF4 data.'}
+                <Typography variant="caption">
+                  {dataMode === 'angular'
+                    ? 'None of the loaded files contain MF4 data. Upload files with MF4 sections.'
+                    : 'None of the loaded files contain MF34 data. Upload files with MF34 sections.'}
+                </Typography>
               </Alert>
             ) : null}
           </Paper>
 
+          {/* Series Cards */}
           {seriesConfigs.map((series, index) => {
             const state = seriesDataMap[series.id];
             const file = files.find((f) => f.name === series.fileName);
@@ -1106,26 +1293,87 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
               );
 
             return (
-              <Accordion key={series.id} defaultExpanded>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                    <Chip size="small" label={`Series ${index + 1}`} color="primary" variant="outlined" />
-                    <Typography variant="subtitle1">
-                      {series.customLabel || series.autoLabel || state?.data?.label || 'Pending'}
+              <Accordion
+                key={series.id}
+                defaultExpanded
+                elevation={0}
+                sx={{
+                  borderRadius: '12px !important',
+                  border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                  overflow: 'hidden',
+                  transition: 'all 0.2s ease',
+                  '&:before': { display: 'none' },
+                  '&:hover': {
+                    borderColor: alpha(series.color, 0.5),
+                    boxShadow: `0 4px 20px ${alpha(series.color, 0.15)}`,
+                  },
+                  '& .MuiAccordionSummary-root': {
+                    minHeight: 'auto',
+                    '&.Mui-expanded': {
+                      minHeight: 'auto',
+                    },
+                  },
+                }}
+              >
+                {/* Colored Header - Clickable to expand/contract */}
+                <AccordionSummary
+                  expandIcon={<ExpandMoreIcon sx={{ color: theme.palette.text.primary }} />}
+                  sx={{
+                    p: 0,
+                    bgcolor: alpha(series.color, 0.08),
+                    '&.Mui-expanded': {
+                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+                    },
+                    '& .MuiAccordionSummary-content': {
+                      m: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      p: 2,
+                      pr: 1,
+                      width: '100%',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        bgcolor: series.color,
+                        boxShadow: `0 0 8px ${alpha(series.color, 0.5)}`,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Typography variant="subtitle1" fontWeight={600} noWrap sx={{ flex: 1 }}>
+                      {series.customLabel || series.autoLabel || state?.data?.label || `Series ${index + 1}`}
                     </Typography>
-                    {state?.status === 'loading' && <LinearProgress sx={{ width: 120 }} />}
+                    {state?.status === 'loading' && (
+                      <CircularProgress size={16} sx={{ color: series.color }} />
+                    )}
                   </Box>
+                  <Tooltip title="Remove series">
+                    <IconButton 
+                      size="small" 
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent accordion toggle
+                        handleRemoveSeries(series.id);
+                      }}
+                      sx={{ 
+                        color: 'error.main',
+                        '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) },
+                        ml: 1,
+                      }}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </AccordionSummary>
-                <AccordionDetails sx={{ p: 3 }}>
+                
+                {/* Series Content */}
+                <AccordionDetails sx={{ px: 2, pb: 2, pt: 2 }}>
                   <Stack spacing={2}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="subtitle2">Data Source</Typography>
-                      <Tooltip title="Remove series">
-                        <IconButton onClick={() => handleRemoveSeries(series.id)}>
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
                     <FormControl fullWidth>
                       <InputLabel>ENDF File</InputLabel>
                       <Select
@@ -1156,8 +1404,17 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
                         }}
                       >
                         {files.map((fileOption) => (
-                          <MenuItem key={fileOption.id} value={fileOption.name}>
+                          <MenuItem 
+                            key={fileOption.id} 
+                            value={fileOption.name}
+                            sx={fileOption.needsReupload ? { 
+                              color: theme.palette.warning.main,
+                              fontStyle: 'italic' 
+                            } : undefined}
+                          >
+                            {fileOption.needsReupload && <WarningAmberIcon sx={{ fontSize: 16, mr: 1 }} />}
                             {fileOption.name}
+                            {fileOption.needsReupload && ' (needs re-upload)'}
                           </MenuItem>
                         ))}
                       </Select>
@@ -1233,18 +1490,36 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
                     )}
 
                     {state?.status === 'error' && (
-                      <Alert severity="error">
+                      <Alert 
+                        severity="error"
+                        action={
+                          file?.needsReupload && onReuploadFile ? (
+                            <Button
+                              color="inherit"
+                              size="small"
+                              startIcon={<CloudUploadIcon />}
+                              onClick={() => onReuploadFile(file.id)}
+                            >
+                              Re-upload
+                            </Button>
+                          ) : undefined
+                        }
+                      >
                         <strong>Error loading data:</strong> {state.error}
-                        <br />
-                        <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-                          Possible causes:
-                          <br />
-                          • <strong>Server not running:</strong> Ensure the KIKA server is running on localhost:8001 (run <code>python kika_server/app.py</code>)
-                          <br />
-                          • <strong>Invalid MT/Order:</strong> The selected MT number or Legendre order may not exist in this file
-                          <br />
-                          • <strong>Missing data:</strong> The file may not contain the requested data type (MF4 or MF34)
-                        </Typography>
+                        {!file?.needsReupload && (
+                          <>
+                            <br />
+                            <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                              Possible causes:
+                              <br />
+                              • <strong>Server not running:</strong> Ensure the KIKA server is running on localhost:8001 (run <code>python kika_server/app.py</code>)
+                              <br />
+                              • <strong>Invalid MT/Order:</strong> The selected MT number or Legendre order may not exist in this file
+                              <br />
+                              • <strong>Missing data:</strong> The file may not contain the requested data type (MF4 or MF34)
+                            </Typography>
+                          </>
+                        )}
                       </Alert>
                     )}
 
@@ -1490,24 +1765,45 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
             );
           })}
 
-          <Paper sx={{ p: 3 }}>
+          {/* Figure Settings Panel */}
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 3,
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            }}
+          >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6">🎛️ Figure Settings</Typography>
+              <Typography variant="h6" fontWeight={600}>
+                Figure Settings
+              </Typography>
               <Button
                 size="small"
+                variant="outlined"
                 startIcon={<RefreshIcon fontSize="small" />}
                 onClick={() => setFigureSettings(getDefaultFigureSettings())}
+                sx={{ borderRadius: 2 }}
               >
-                Reset All
+                Reset
               </Button>
             </Box>
 
             {/* Labels, Title & Legend */}
-            <Accordion defaultExpanded>
+            <Accordion 
+              defaultExpanded
+              elevation={0}
+              sx={{ 
+                '&:before': { display: 'none' },
+                bgcolor: alpha(theme.palette.background.default, 0.5),
+                borderRadius: '8px !important',
+                mb: 1,
+              }}
+            >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1">🏷️ Labels, Title & Legend</Typography>
+                <Typography variant="subtitle1" fontWeight={500}>Labels & Legend</Typography>
               </AccordionSummary>
-              <AccordionDetails sx={{ p: 4 }}>
+              <AccordionDetails sx={{ p: 2 }}>
                 <Stack spacing={2}>
                   <Grid container spacing={2} alignItems="center">
                     <Grid item xs={9}>
@@ -1606,13 +1902,22 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
             </Accordion>
 
             {/* Zoom, Scales & Grid */}
-            <Accordion defaultExpanded>
+            <Accordion 
+              defaultExpanded
+              elevation={0}
+              sx={{ 
+                '&:before': { display: 'none' },
+                bgcolor: alpha(theme.palette.background.default, 0.5),
+                borderRadius: '8px !important',
+                mb: 1,
+              }}
+            >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1">🔍 Zoom, Scales & Grid</Typography>
+                <Typography variant="subtitle1" fontWeight={500}>Scales & Grid</Typography>
               </AccordionSummary>
-              <AccordionDetails sx={{ p: 4 }}>
+              <AccordionDetails sx={{ p: 2 }}>
                 <Stack spacing={2}>
-                  <Typography variant="subtitle2">🔍 Zoom / Axis Limits</Typography>
+                  <Typography variant="caption" color="text.secondary" fontWeight={500}>Axis Limits</Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">X-axis Range</Typography>
@@ -1753,48 +2058,19 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
               </AccordionDetails>
             </Accordion>
 
-            {/* Figure Size */}
-            <Accordion defaultExpanded>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1">📐 Figure Size</Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ p: 4 }}>
-                <Stack spacing={2}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="Width (inches)"
-                        type="number"
-                        value={figureSettings.figWidthInches}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, figWidthInches: Number(event.target.value) })}
-                        inputProps={{ min: 4, max: 20, step: 0.5 }}
-                        fullWidth
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="Height (inches)"
-                        type="number"
-                        value={figureSettings.figHeightInches}
-                        onChange={(event) => setFigureSettings({ ...figureSettings, figHeightInches: Number(event.target.value) })}
-                        inputProps={{ min: 3, max: 16, step: 0.5 }}
-                        fullWidth
-                      />
-                    </Grid>
-                  </Grid>
-                  <Typography variant="caption" color="text.secondary">
-                    Display: {Math.round(figureSettings.figWidthInches * 96)} × {Math.round(figureSettings.figHeightInches * 96)} pixels @ 96 DPI
-                  </Typography>
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
-
             {/* Advanced: Tick Parameters */}
-            <Accordion>
+            <Accordion
+              elevation={0}
+              sx={{ 
+                '&:before': { display: 'none' },
+                bgcolor: alpha(theme.palette.background.default, 0.5),
+                borderRadius: '8px !important',
+              }}
+            >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1">⚙️ Advanced: Tick Parameters</Typography>
+                <Typography variant="subtitle1" fontWeight={500}>Advanced Settings</Typography>
               </AccordionSummary>
-              <AccordionDetails sx={{ p: 4 }}>
+              <AccordionDetails sx={{ p: 2 }}>
                 <Stack spacing={2}>
                   <Typography variant="subtitle2">X-axis Ticks</Typography>
                   <Grid container spacing={2}>
@@ -1868,8 +2144,16 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
             </Accordion>
           </Paper>
 
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
+          {/* Saved Configurations Panel */}
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 3,
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            }}
+          >
+            <Typography variant="h6" fontWeight={600} gutterBottom>
               Saved Configurations
             </Typography>
             <Stack spacing={2}>
@@ -1877,29 +2161,44 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
                 label="Configuration Name"
                 value={configName}
                 onChange={(event) => setConfigName(event.target.value)}
+                size="small"
+                placeholder="My Plot Configuration"
               />
               <Button
                 variant="contained"
                 startIcon={<SaveOutlinedIcon />}
                 onClick={handleSaveConfig}
                 disabled={files.length === 0}
+                sx={{ borderRadius: 2 }}
               >
                 Save Current Setup
               </Button>
               {savedConfigs.length === 0 && (
-                <Alert severity="info">No saved plots yet. Save your layout to reuse later.</Alert>
+                <Alert severity="info" sx={{ borderRadius: 2 }}>
+                  No saved configurations yet.
+                </Alert>
               )}
               {savedConfigs.map((configInfo) => (
-                <Paper key={configInfo.id} variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="subtitle1">{configInfo.name}</Typography>
+                <Paper 
+                  key={configInfo.id} 
+                  variant="outlined" 
+                  sx={{ 
+                    p: 2, 
+                    borderRadius: 2,
+                    bgcolor: alpha(theme.palette.background.default, 0.5),
+                  }}
+                >
+                  <Typography variant="subtitle2" fontWeight={600}>{configInfo.name}</Typography>
                   <Typography variant="caption" color="text.secondary">
                     {configInfo.dataMode === 'angular' ? 'Angular Distributions' : 'Uncertainties'} • {formatTimestamp(configInfo.createdAt)}
                   </Typography>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
                     <Button
                       startIcon={<RestoreOutlinedIcon />}
                       size="small"
+                      variant="outlined"
                       onClick={() => handleRestoreConfig(configInfo.id)}
+                      sx={{ borderRadius: 1.5 }}
                     >
                       Restore
                     </Button>
@@ -1917,7 +2216,16 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
           </Paper>
 
           {notification && (
-            <Alert severity={notification.type} onClose={() => setNotification(null)} sx={{ mt: 2 }}>
+            <Alert 
+              severity={notification.type} 
+              onClose={() => setNotification(null)} 
+              sx={{ 
+                borderRadius: 2,
+                bgcolor: notification.type === 'success' 
+                  ? alpha(theme.palette.success.main, 0.1)
+                  : alpha(theme.palette.error.main, 0.1),
+              }}
+            >
               {notification.message}
             </Alert>
           )}
@@ -1926,25 +2234,164 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
 
       <Grid item xs={12} lg={8}>
         <Box sx={{ position: 'sticky', top: 16, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto' }}>
-          <Paper sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="h6">📊 Plot Preview</Typography>
-            {plotlyData.length === 0 ? (
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 3, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 2,
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            }}
+          >
+            {/* Header with Preview Mode Toggle */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+              <Typography variant="h6" fontWeight={600}>
+                📊 Plot Preview
+              </Typography>
+              <ToggleButtonGroup
+                value={previewMode}
+                exclusive
+                onChange={(_, value) => value && setPreviewMode(value)}
+                size="small"
+              >
+                <ToggleButton value="matplotlib" sx={{ px: 2 }}>
+                  <ImageIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                  Matplotlib
+                </ToggleButton>
+                <ToggleButton value="plotly" sx={{ px: 2 }}>
+                  <AutoGraphIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                  Plotly
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+
+            {/* Preview Mode Info */}
+            {previewMode === 'matplotlib' && (
+              <Alert severity="info" sx={{ py: 0.5 }}>
+                <Typography variant="caption">
+                  <strong>Matplotlib Preview:</strong> Shows exactly what will be exported. Updates automatically with a small delay.
+                </Typography>
+              </Alert>
+            )}
+
+            {/* Plot Display Area */}
+            {seriesConfigs.length === 0 ? (
               <Box
                 sx={{
                   minHeight: 400,
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: '2px dashed',
-                  borderColor: 'grey.300',
-                  borderRadius: 2,
+                  borderColor: alpha(theme.palette.divider, 0.3),
+                  borderRadius: 3,
+                  bgcolor: alpha(theme.palette.background.default, 0.5),
+                  p: 4,
                 }}
               >
-                <Typography color="text.secondary" align="center">
-                  Configure series on the left and the plot will appear here in real time.
+                <Box
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                    color: theme.palette.secondary.main,
+                    mb: 2,
+                  }}
+                >
+                  <AutoGraphIcon sx={{ fontSize: 32 }} />
+                </Box>
+                <Typography variant="body1" fontWeight={500} gutterBottom>
+                  No Series Configured
+                </Typography>
+                <Typography color="text.secondary" align="center" sx={{ maxWidth: 300 }}>
+                  Add data series using the panel on the left to start plotting
                 </Typography>
               </Box>
+            ) : previewMode === 'matplotlib' ? (
+              // Matplotlib Preview
+              <Box
+                sx={{
+                  width: '100%',
+                  minHeight: 400,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  bgcolor: '#fff',
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}
+              >
+                {livePreviewError && !livePreviewImage && !livePreviewLoading && (
+                  <Box sx={{ textAlign: 'center', p: 4 }}>
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {livePreviewError}
+                    </Alert>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<RefreshIcon />}
+                      onClick={generateLivePreview}
+                    >
+                      Retry
+                    </Button>
+                  </Box>
+                )}
+                {livePreviewImage && (
+                  <Box sx={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
+                    <img
+                      src={`data:image/${livePreviewImage.format};base64,${livePreviewImage.image_base64}`}
+                      alt="Matplotlib preview"
+                      style={{ 
+                        maxWidth: '100%', 
+                        height: 'auto',
+                        display: 'block',
+                      }}
+                    />
+                    {livePreviewLoading && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          bgcolor: 'rgba(255,255,255,0.9)',
+                          borderRadius: 1,
+                          px: 1.5,
+                          py: 0.5,
+                          boxShadow: 1,
+                        }}
+                      >
+                        <CircularProgress size={16} color="secondary" />
+                        <Typography variant="caption" color="text.secondary">
+                          Updating...
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                )}
+                {!livePreviewImage && !livePreviewError && (
+                  <Box sx={{ textAlign: 'center', p: 4 }}>
+                    <CircularProgress size={40} color="secondary" />
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                      {livePreviewLoading ? 'Generating preview...' : 'Loading preview...'}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
             ) : (
+              // Plotly Preview (legacy)
               <Box
                 sx={{
                   width: '100%',
@@ -1952,7 +2399,7 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
                   overflow: 'auto',
                   border: '1px solid',
                   borderColor: 'divider',
-                  borderRadius: 1,
+                  borderRadius: 2,
                 }}
               >
                 <Plot
@@ -1970,26 +2417,39 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
               </Box>
             )}
 
+            {/* Export Buttons */}
             <Stack direction="row" spacing={2}>
-              <Button
-                variant="outlined"
-                startIcon={<DownloadIcon />}
-                onClick={handleQuickExport}
-                disabled={exporting || plotlyData.length === 0}
-                fullWidth
-              >
-                {exporting ? 'Exporting...' : 'Quick Export (Plotly)'}
-              </Button>
+              {previewMode === 'plotly' && (
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleQuickExport}
+                  disabled={exporting || plotlyData.length === 0}
+                  fullWidth
+                >
+                  {exporting ? 'Exporting...' : 'Quick Export (Plotly)'}
+                </Button>
+              )}
               <Button
                 variant="contained"
                 startIcon={<HighQualityIcon />}
                 onClick={() => setExportDialogOpen(true)}
-                disabled={exporting || plotlyData.length === 0}
+                disabled={exporting || seriesConfigs.length === 0}
                 fullWidth
                 color="secondary"
               >
-                Export (High Quality)
+                Export High Quality
               </Button>
+              {previewMode === 'matplotlib' && (
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={generateLivePreview}
+                  disabled={livePreviewLoading || seriesConfigs.length === 0}
+                >
+                  Refresh
+                </Button>
+              )}
             </Stack>
           </Paper>
         </Box>
@@ -1997,11 +2457,14 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
 
       <Dialog
         fullWidth
-        maxWidth="md"
+        maxWidth="lg"
         open={exportDialogOpen}
         onClose={() => {
           setExportDialogOpen(false);
           setPreviewImage(null);
+        }}
+        PaperProps={{
+          sx: { minHeight: '70vh' }
         }}
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -2009,24 +2472,31 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
         </DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={5}>
-              <Stack spacing={2}>
-                <FormControl fullWidth>
-                  <InputLabel>Plot Style</InputLabel>
-                  <Select
+            <Grid item xs={12} md={4}>
+              <Stack spacing={2.5}>
+                <Typography variant="subtitle2" fontWeight={600}>Style & Format</Typography>
+                
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                    Plot Style
+                  </Typography>
+                  <ToggleButtonGroup
                     value={matplotlibExportSettings.style}
-                    label="Plot Style"
-                    onChange={(event) =>
-                      setMatplotlibExportSettings({ ...matplotlibExportSettings, style: event.target.value })
-                    }
+                    exclusive
+                    fullWidth
+                    onChange={(_, value) => {
+                      if (value) {
+                        setMatplotlibExportSettings({ ...matplotlibExportSettings, style: value });
+                      }
+                    }}
+                    size="small"
                   >
-                    <MenuItem value="publication">Publication</MenuItem>
-                    <MenuItem value="default">Default</MenuItem>
-                    <MenuItem value="presentation">Presentation</MenuItem>
-                    <MenuItem value="dark">Dark</MenuItem>
-                  </Select>
-                </FormControl>
-                <FormControl fullWidth>
+                    <ToggleButton value="light">Light</ToggleButton>
+                    <ToggleButton value="dark">Dark</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+
+                <FormControl fullWidth size="small">
                   <InputLabel>Export Format</InputLabel>
                   <Select
                     value={matplotlibExportSettings.format}
@@ -2040,57 +2510,126 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files }) => {
                     <MenuItem value="svg">SVG</MenuItem>
                   </Select>
                 </FormControl>
+
+                <Divider />
+                <Typography variant="subtitle2" fontWeight={600}>Figure Size</Typography>
+                
+                <Grid container spacing={1.5}>
+                  <Grid item xs={6}>
+                    <TextField
+                      label="Width (in)"
+                      type="number"
+                      size="small"
+                      value={matplotlibExportSettings.figWidthInches}
+                      onChange={(event) =>
+                        setMatplotlibExportSettings({ ...matplotlibExportSettings, figWidthInches: Number(event.target.value) })
+                      }
+                      inputProps={{ min: 4, max: 20, step: 0.5 }}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      label="Height (in)"
+                      type="number"
+                      size="small"
+                      value={matplotlibExportSettings.figHeightInches}
+                      onChange={(event) =>
+                        setMatplotlibExportSettings({ ...matplotlibExportSettings, figHeightInches: Number(event.target.value) })
+                      }
+                      inputProps={{ min: 3, max: 16, step: 0.5 }}
+                      fullWidth
+                    />
+                  </Grid>
+                </Grid>
+
                 <TextField
-                  label="DPI"
+                  label="DPI (Resolution)"
                   type="number"
+                  size="small"
                   value={matplotlibExportSettings.dpi}
                   onChange={(event) =>
                     setMatplotlibExportSettings({ ...matplotlibExportSettings, dpi: Number(event.target.value) })
                   }
                   inputProps={{ min: 150, max: 600, step: 25 }}
+                  fullWidth
+                  helperText={`Output: ${Math.round(matplotlibExportSettings.figWidthInches * matplotlibExportSettings.dpi)} × ${Math.round(matplotlibExportSettings.figHeightInches * matplotlibExportSettings.dpi)} px`}
                 />
+
                 <Button
                   variant="outlined"
-                  startIcon={<InfoOutlinedIcon />}
+                  startIcon={<RefreshIcon />}
                   onClick={handleGeneratePreview}
                   disabled={generatingPreview}
+                  fullWidth
                 >
                   Refresh Preview
                 </Button>
               </Stack>
             </Grid>
-            <Grid item xs={12} md={7}>
+            <Grid item xs={12} md={8}>
               <Box
                 sx={{
                   border: '1px solid',
                   borderColor: 'divider',
-                  minHeight: 320,
+                  borderRadius: 2,
+                  minHeight: 450,
+                  height: '100%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  bgcolor: matplotlibExportSettings.style === 'dark' ? '#1a1a1a' : '#fafafa',
+                  overflow: 'hidden',
                 }}
               >
-                {generatingPreview && (
-                  <Box sx={{ textAlign: 'center' }}>
-                    <LinearProgress sx={{ width: '60%', mb: 2 }} />
+                {previewImage ? (
+                  <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 2, position: 'relative' }}>
+                    <img
+                      src={`data:image/${previewImage.format};base64,${previewImage.base64}`}
+                      alt="Matplotlib preview"
+                      style={{ 
+                        width: previewImage ? `${exportPreviewWidth}px` : undefined,
+                        height: previewImage ? `${exportPreviewHeight}px` : undefined,
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
+                    />
+                    {generatingPreview && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          bgcolor: 'rgba(255,255,255,0.9)',
+                          borderRadius: 1,
+                          px: 1.5,
+                          py: 0.5,
+                          boxShadow: 1,
+                        }}
+                      >
+                        <CircularProgress size={16} color="secondary" />
+                        <Typography variant="caption" color="text.secondary">
+                          Updating...
+                        </Typography>
+                      </Box>
+                    )}
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                      Preview: {previewImage.width} × {previewImage.height} px @ {previewImage.dpi} DPI (displayed at {Math.round(exportPreviewScale * 100)}% scale)
+                    </Typography>
+                  </Box>
+                ) : generatingPreview ? (
+                  <Box sx={{ textAlign: 'center', width: '100%' }}>
+                    <LinearProgress sx={{ width: 200, mb: 2, mx: 'auto' }} />
                     <Typography variant="body2" color="text.secondary">
                       Generating preview...
                     </Typography>
                   </Box>
-                )}
-                {!generatingPreview && previewImage && (
-                  <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <img
-                      src={`data:image/${previewImage.format};base64,${previewImage.base64}`}
-                      alt="Matplotlib preview"
-                      style={{ maxWidth: '100%', height: 'auto' }}
-                    />
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                      Preview: {previewImage.width} × {previewImage.height} px @ {previewImage.dpi} DPI
-                    </Typography>
-                  </Box>
-                )}
-                {!generatingPreview && !previewImage && (
+                ) : (
                   <Alert severity="info" sx={{ m: 2 }}>
                     Click "Refresh Preview" or change the plot style to generate a preview.
                   </Alert>

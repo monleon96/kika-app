@@ -236,12 +236,13 @@ export async function uploadACEFile(file: File): Promise<ACEInfo> {
 export interface MatplotlibExportRequest {
   series: Array<{
     fileName: string;
-    fileId?: string;
-    mtNumber?: number;
-    energy?: number;
-    plotType: string;
-    color: string;
-    lineWidth: number;
+  fileId?: string;
+  file_content?: string;
+  mtNumber?: number;
+  energy?: number;
+  plotType: string;
+  color: string;
+  lineWidth: number;
     lineStyle: string;
     showMarkers: boolean;
     markerSymbol: string;
@@ -344,6 +345,21 @@ export async function exportWithMatplotlib(
 }
 
 /**
+ * Generate a matplotlib preview image for ACE data (lower DPI for faster rendering)
+ * Optimized for real-time preview in the UI
+ */
+export async function getACEMatplotlibPreview(
+  request: Omit<MatplotlibExportRequest, 'dpi' | 'export_format'> & { dpi?: number }
+): Promise<MatplotlibExportResponse> {
+  const previewRequest: MatplotlibExportRequest = {
+    ...request,
+    dpi: request.dpi || 100,
+    export_format: 'png',
+  };
+  return exportWithMatplotlib(previewRequest);
+}
+
+/**
  * Export ENDF plot using Matplotlib
  */
 export async function exportENDFWithMatplotlib(
@@ -363,4 +379,20 @@ export async function exportENDFWithMatplotlib(
   }
 
   return response.json();
+}
+
+/**
+ * Generate a matplotlib preview image for ENDF data (lower DPI for faster rendering)
+ * This is optimized for real-time preview in the UI
+ */
+export async function getENDFMatplotlibPreview(
+  request: Omit<ENDFMatplotlibExportRequest, 'dpi' | 'export_format'> & { dpi?: number }
+): Promise<MatplotlibExportResponse> {
+  const previewRequest: ENDFMatplotlibExportRequest = {
+    ...request,
+    dpi: request.dpi || 100, // Lower DPI for faster preview
+    export_format: 'png',
+  };
+  
+  return exportENDFWithMatplotlib(previewRequest);
 }

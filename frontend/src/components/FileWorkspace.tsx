@@ -6,44 +6,38 @@ import {
   IconButton,
   Button,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   ListItemIcon,
   Chip,
   TextField,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
   Divider,
-  Alert,
   CircularProgress,
-  Badge,
+  alpha,
+  useTheme,
+  InputAdornment,
+  Tooltip,
 } from '@mui/material';
 import {
   Close,
   UploadFile,
   Delete,
-  DeleteSweep,
   Science,
   InsertDriveFile,
   Search,
-  Sort,
-  FilterList,
   CheckCircle,
   Error as ErrorIcon,
   HourglassEmpty,
+  OpenInNew,
+  Edit,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
-import type { FileType, WorkspaceFile, ENDFMetadata } from '../types/file';
+import type { WorkspaceFile } from '../types/file';
 import { formatFileSize } from '../utils/fileDetection';
 
 // Check if running in Tauri
 const isTauri = '__TAURI__' in window;
-
-const isENDFMetadata = (metadata?: WorkspaceFile['metadata']): metadata is ENDFMetadata => {
-  return Boolean(metadata && 'angular_mts' in metadata);
-};
 
 interface FileWorkspaceProps {
   open: boolean;
@@ -54,20 +48,24 @@ interface FileWorkspaceProps {
 export const FileWorkspace: React.FC<FileWorkspaceProps> = ({ 
   open, 
   onClose,
-  width = 400,
+  width = 360,
 }) => {
+  const theme = useTheme();
+  const navigate = useNavigate();
   const {
     files,
     filter,
     addFiles,
     removeFile,
-    clearAll,
+    renameFile,
     setFilter,
     getFilteredFiles,
   } = useFileWorkspace();
 
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredFiles = getFilteredFiles();
@@ -104,14 +102,8 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
       const selected = await openDialog({
         multiple: true,
         filters: [
-          {
-            name: 'All Files',
-            extensions: ['*'],
-          },
-          {
-            name: 'Nuclear Data Files',
-            extensions: ['ace', 'endf', 'endf6', '02c', '03c', '20c', '21c', '22c', '23c', '70c', '80c', '12c', '32c', '04c', 'txt'],
-          },
+          { name: 'All Files', extensions: ['*'] },
+          { name: 'Nuclear Data Files', extensions: ['ace', 'endf', 'endf6', '02c', '03c', '70c', '80c', 'txt'] },
         ],
       });
 
@@ -151,20 +143,17 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFiles(e.dataTransfer.files);
     }
   }, [handleFiles]);
 
-  // Browser file input handler
   const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleFiles(e.target.files);
     }
   }, [handleFiles]);
 
-  // Open file dialog
   const openFileDialog = useCallback(() => {
     if (isTauri) {
       handleTauriFileSelect();
@@ -173,21 +162,40 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
     }
   }, [handleTauriFileSelect]);
 
-  // Get icon and color for file type
-  const getFileIcon = (file: WorkspaceFile) => {
-    if (file.status === 'error') {
-      return <ErrorIcon color="error" />;
+  const handleFileClick = (file: WorkspaceFile) => {
+    if (file.status === 'ready') {
+      if (file.type === 'ace') {
+        navigate('/ace-files');
+      } else if (file.type === 'endf') {
+        navigate('/endf-files');
+      }
+      onClose();
     }
-    if (file.status === 'parsing' || file.status === 'pending') {
-      return <HourglassEmpty color="action" />;
+  };
+
+  const startEditing = (file: WorkspaceFile, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(file.id);
+    setEditName(file.displayName);
+  };
+
+  const saveEdit = () => {
+    if (editingId && editName.trim()) {
+      renameFile(editingId, editName.trim());
     }
-    if (file.type === 'ace') {
-      return <Science color="primary" />;
-    }
-    if (file.type === 'endf') {
-      return <InsertDriveFile color="secondary" />;
-    }
-    return <InsertDriveFile />;
+    setEditingId(null);
+  };
+
+  const getFileColor = (file: WorkspaceFile) => {
+    if (file.type === 'ace') return theme.palette.primary.main;
+    if (file.type === 'endf') return theme.palette.secondary.main;
+    return theme.palette.grey[500];
+  };
+
+  const getStatusIcon = (file: WorkspaceFile) => {
+    if (file.status === 'error') return <ErrorIcon sx={{ fontSize: 14 }} color="error" />;
+    if (file.status === 'parsing' || file.status === 'pending') return <HourglassEmpty sx={{ fontSize: 14 }} color="warning" />;
+    return <CheckCircle sx={{ fontSize: 14 }} color="success" />;
   };
 
   return (
@@ -207,41 +215,35 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
           position: 'relative',
           border: 'none',
           top: 'auto',
+          bgcolor: 'background.default',
         },
       }}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {/* Header */}
         <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h6" component="div">
-            📁 File Workspace
+          <Typography variant="subtitle1" fontWeight={600}>
+            Quick Files
           </Typography>
-          <IconButton onClick={onClose} size="small">
-            <Close />
-          </IconButton>
+          <Box>
+            <Tooltip title="Open File Manager">
+              <IconButton size="small" onClick={() => { navigate('/files'); onClose(); }}>
+                <OpenInNew fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <IconButton onClick={onClose} size="small">
+              <Close fontSize="small" />
+            </IconButton>
+          </Box>
         </Box>
 
-        <Divider />
-
-        {/* Stats */}
-        <Box sx={{ px: 2, py: 1, display: 'flex', gap: 1 }}>
-          <Badge badgeContent={aceCount} color="primary">
-            <Chip label="ACE" size="small" icon={<Science />} />
-          </Badge>
-          <Badge badgeContent={endfCount} color="secondary">
-            <Chip label="ENDF" size="small" icon={<InsertDriveFile />} />
-          </Badge>
-        </Box>
-
-        <Divider />
-
-        {/* Upload Area */}
+        {/* Stats & Upload */}
         <Box
           sx={{
-            p: 2,
-            bgcolor: dragActive ? 'action.hover' : 'background.default',
-            border: dragActive ? '2px dashed' : '2px dashed transparent',
-            borderColor: 'primary.main',
+            px: 2,
+            pb: 2,
+            bgcolor: dragActive ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+            border: dragActive ? `2px dashed ${theme.palette.primary.main}` : '2px dashed transparent',
             transition: 'all 0.2s',
           }}
           onDragEnter={handleDrag}
@@ -249,6 +251,27 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
           onDragOver={handleDrag}
           onDrop={handleDrop}
         >
+          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+            <Chip
+              icon={<Science sx={{ fontSize: 16 }} />}
+              label={aceCount}
+              size="small"
+              color="primary"
+              variant={filter.type === 'ace' ? 'filled' : 'outlined'}
+              onClick={() => setFilter({ type: filter.type === 'ace' ? 'all' : 'ace' })}
+              sx={{ flex: 1 }}
+            />
+            <Chip
+              icon={<InsertDriveFile sx={{ fontSize: 16 }} />}
+              label={endfCount}
+              size="small"
+              color="secondary"
+              variant={filter.type === 'endf' ? 'filled' : 'outlined'}
+              onClick={() => setFilter({ type: filter.type === 'endf' ? 'all' : 'endf' })}
+              sx={{ flex: 1 }}
+            />
+          </Box>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -259,156 +282,137 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
           
           <Button
             variant="contained"
-            startIcon={uploading ? <CircularProgress size={20} /> : <UploadFile />}
+            startIcon={uploading ? <CircularProgress size={18} color="inherit" /> : <UploadFile />}
             onClick={openFileDialog}
             disabled={uploading}
             fullWidth
-          >
-            {uploading ? 'Uploading...' : 'Upload Files'}
-          </Button>
-
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
-            Drop files here or click to browse
-          </Typography>
-        </Box>
-
-        <Divider />
-
-        {/* Filters */}
-        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <TextField
             size="small"
-            placeholder="Search files..."
-            value={filter.searchQuery}
-            onChange={(e) => setFilter({ searchQuery: e.target.value })}
-            InputProps={{
-              startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />,
-            }}
-          />
-
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Type</InputLabel>
-              <Select
-                value={filter.type}
-                label="Type"
-                onChange={(e) => setFilter({ type: e.target.value as FileType | 'all' })}
-                startAdornment={<FilterList sx={{ mr: 1, color: 'action.active' }} />}
-              >
-                <MenuItem value="all">All</MenuItem>
-                <MenuItem value="ace">ACE</MenuItem>
-                <MenuItem value="endf">ENDF</MenuItem>
-              </Select>
-            </FormControl>
-
-            <FormControl size="small" fullWidth>
-              <InputLabel>Sort</InputLabel>
-              <Select
-                value={filter.sortBy}
-                label="Sort"
-                onChange={(e) => setFilter({ sortBy: e.target.value as any })}
-                startAdornment={<Sort sx={{ mr: 1, color: 'action.active' }} />}
-              >
-                <MenuItem value="date">Date</MenuItem>
-                <MenuItem value="name">Name</MenuItem>
-                <MenuItem value="type">Type</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
+          >
+            {uploading ? 'Uploading...' : 'Upload'}
+          </Button>
         </Box>
+
+        {/* Search */}
+        {files.length > 0 && (
+          <Box sx={{ px: 2, pb: 1 }}>
+            <TextField
+              size="small"
+              placeholder="Search..."
+              value={filter.searchQuery}
+              onChange={(e) => setFilter({ searchQuery: e.target.value })}
+              fullWidth
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search sx={{ fontSize: 18, color: 'action.active' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ '& .MuiInputBase-input': { py: 0.75 } }}
+            />
+          </Box>
+        )}
 
         <Divider />
 
         {/* File List */}
         <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
           {filteredFiles.length === 0 ? (
-            <Alert severity="info" sx={{ m: 2 }}>
-              {files.length === 0 
-                ? 'No files uploaded yet. Upload ACE or ENDF files to get started!'
-                : 'No files match the current filters.'}
-            </Alert>
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                {files.length === 0 ? 'No files yet' : 'No matches'}
+              </Typography>
+            </Box>
           ) : (
-            <List dense>
+            <List dense disablePadding>
               {filteredFiles.map((file) => (
-                <ListItem
+                <ListItemButton
                   key={file.id}
-                  secondaryAction={
-                    <IconButton
-                      edge="end"
-                      size="small"
-                      onClick={() => removeFile(file.id)}
-                      title="Remove file"
-                    >
-                      <Delete />
-                    </IconButton>
-                  }
+                  onClick={() => handleFileClick(file)}
                   sx={{
-                    borderLeft: file.status === 'error' ? '3px solid' : 'none',
-                    borderColor: 'error.main',
+                    py: 1,
+                    px: 2,
+                    borderLeft: `3px solid ${getFileColor(file)}`,
+                    '&:hover': {
+                      bgcolor: alpha(getFileColor(file), 0.08),
+                    },
                   }}
                 >
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    {getFileIcon(file)}
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    {file.type === 'ace' ? (
+                      <Science sx={{ fontSize: 20 }} color="primary" />
+                    ) : (
+                      <InsertDriveFile sx={{ fontSize: 20 }} color="secondary" />
+                    )}
                   </ListItemIcon>
                   <ListItemText
                     primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2" noWrap>
-                          {file.name}
-                        </Typography>
-                        {file.status === 'ready' && (
-                          <CheckCircle color="success" sx={{ fontSize: 16 }} />
-                        )}
-                      </Box>
+                      editingId === file.id ? (
+                        <TextField
+                          size="small"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onBlur={saveEdit}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit();
+                            if (e.key === 'Escape') setEditingId(null);
+                          }}
+                          autoFocus
+                          fullWidth
+                          onClick={(e) => e.stopPropagation()}
+                          sx={{ '& .MuiInputBase-input': { py: 0.25, fontSize: '0.875rem' } }}
+                        />
+                      ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="body2" noWrap sx={{ flex: 1 }}>
+                            {file.displayName}
+                          </Typography>
+                          {getStatusIcon(file)}
+                        </Box>
+                      )
                     }
                     secondary={
-                      <>
-                        <Typography variant="caption" component="span" display="block">
-                          {file.type?.toUpperCase() || 'Unknown'} • {formatFileSize(file.size)}
-                        </Typography>
-                        {file.metadata && 'zaid' in file.metadata && (
-                          <Typography variant="caption" component="span" display="block" color="text.secondary">
-                            ZAID: {file.metadata.zaid}
-                          </Typography>
-                        )}
-                        {isENDFMetadata(file.metadata) && file.metadata.isotope && (
-                          <Typography variant="caption" component="span" display="block" color="text.secondary">
-                            Isotope: {file.metadata.isotope}
-                          </Typography>
-                        )}
-                        {isENDFMetadata(file.metadata) && (
-                          <Typography variant="caption" component="span" display="block" color="text.secondary">
-                            MF4 MTs: {file.metadata.angular_mts.length} • MF34 MTs: {file.metadata.uncertainty_mts.length}
-                          </Typography>
-                        )}
-                        {file.error && (
-                          <Typography variant="caption" component="span" display="block" color="error">
-                            {file.error}
-                          </Typography>
-                        )}
-                      </>
+                      <Typography variant="caption" color="text.secondary" component="span">
+                        {file.metadata && 'zaid' in file.metadata && file.metadata.zaid}
+                        {file.metadata && 'isotope' in file.metadata && file.metadata.isotope && ` • ${file.metadata.isotope}`}
+                        {!file.metadata && `${formatFileSize(file.size)}`}
+                      </Typography>
                     }
+                    sx={{ my: 0 }}
                   />
-                </ListItem>
+                  <Box sx={{ display: 'flex', gap: 0.5, ml: 1 }}>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => startEditing(file, e)}
+                      sx={{ p: 0.5 }}
+                    >
+                      <Edit sx={{ fontSize: 16 }} />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); removeFile(file.id); }}
+                      sx={{ p: 0.5 }}
+                    >
+                      <Delete sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Box>
+                </ListItemButton>
               ))}
             </List>
           )}
         </Box>
 
-        {/* Footer Actions */}
-        {files.length > 0 && (
+        {/* Footer */}
+        {files.length > 3 && (
           <>
             <Divider />
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: 1.5, textAlign: 'center' }}>
               <Button
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteSweep />}
-                onClick={clearAll}
-                fullWidth
                 size="small"
+                onClick={() => { navigate('/files'); onClose(); }}
+                endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
               >
-                Clear All Files
+                View all {files.length} files
               </Button>
             </Box>
           </>

@@ -7,9 +7,6 @@ REM    1. Copy this file and rename it, e.g. kika_proxy.bat
 REM    2. Edit the PROXY SETTINGS section with your own details.
 REM    3. Double–click your .bat to start KIKA with proxy enabled.
 REM 
-REM  IMPORTANT:
-REM    - Do NOT commit your real username/password to the repository.
-REM    - Keep the version in git with placeholders only.
 REM ============================================================
 
 REM === Path to the KIKA executable (relative to this .bat) ===
