@@ -468,7 +468,7 @@ export const ACEFilePage: React.FC = () => {
                 <Button
                   variant="contained"
                   startIcon={<Visibility />}
-                  onClick={() => navigate(`/ace-files/${fileId}/cross-sections`)}
+                  onClick={() => navigate('/ace-files/plotter')}
                 >
                   Open Plotter
                 </Button>
