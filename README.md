@@ -6,80 +6,62 @@ A desktop application for visualizing and analyzing nuclear data files (ACE and 
 
 *   **`frontend/`**: Desktop application built with Tauri and React.
 *   **`backend-auth/`**: Authentication service (FastAPI) - handles user registration, login, and verification.
-*   **`backend-core/`**: Core processing service (FastAPI) - interfaces with the KIKA library for nuclear data parsing and plotting.
+*   **`kika-api/`**: Local API server (FastAPI) - wraps the `kika-nd` library for nuclear data parsing and plotting.
 *   **`docs/`**: Project documentation including the [Frontend Developer Guide](docs/FRONTEND_DEVELOPER_GUIDE.md).
-*   **`setup_workspace.sh`**: Script to set up the development environment.
-*   **`start_dev.sh`**: Script to start all services for development.
 
 ## Setup
 
-1.  **Prerequisites**: 
-    - Python 3.12+
-    - Node.js 20 LTS (via nvm recommended)
-    - Rust (optional, only needed for Tauri desktop builds)
+### Prerequisites
+- Python 3.12+
+- Node.js 20 LTS
+- Rust (required for Tauri desktop builds)
 
-2.  **Environment Setup**:
-    Run the setup script to create a virtual environment and install dependencies (including the editable install of the `kika` library).
+### Windows Setup
 
-    ```bash
-    ./setup_workspace.sh
-    ```
+```batch
+REM Run the setup script
+setup_workspace_windows.bat
+```
 
-3.  **Install Frontend Dependencies**:
-    ```bash
-    cd frontend
-    npm install
-    cd ..
-    ```
+### Linux/WSL Setup
+
+```bash
+./setup_workspace.sh
+```
 
 ## Running the Application
 
-### Quick Start (Recommended)
+### Windows (Tauri Desktop App - Recommended)
 
-Use the development script to start all services at once:
+```batch
+start_dev_windows.bat
+```
+
+This starts:
+- Core backend on `http://localhost:8001`
+- Tauri Desktop App (opens automatically)
+- Auth backend in the cloud (https://kika-backend.onrender.com)
+
+### Linux/WSL (Browser Mode)
 
 ```bash
 ./start_dev.sh
 ```
 
 This starts:
-- Auth backend on `http://localhost:8000`
 - Core backend on `http://localhost:8001`
-- Frontend on `http://localhost:1420`
+- Frontend on `http://localhost:1420` (browser)
+- Auth backend in the cloud
 
-Open `http://localhost:1420` in your browser to use the application.
+Open `http://localhost:1420` in your browser.
 
-### Manual Start (Separate Terminals)
+### Linux (Tauri Desktop App)
 
-If you prefer to run services individually:
-
-**Terminal 1 - Authentication Backend:**
 ```bash
-source venv/bin/activate
-cd backend-auth
-uvicorn app:app --reload --port 8000
+./start_app.sh
 ```
 
-**Terminal 2 - Core Backend:**
-```bash
-source venv/bin/activate
-cd backend-core
-uvicorn app.main:app --reload --port 8001
-```
-
-**Terminal 3 - Frontend (Browser Mode):**
-```bash
-cd frontend
-npm run dev
-```
-
-**Terminal 3 - Frontend (Tauri Desktop Mode):**
-```bash
-cd frontend
-npm run tauri dev
-```
-
-> **Note**: Tauri mode requires a display server. For WSL without display, use browser mode.
+> **Note**: Tauri mode requires a display server. For WSL without display, use `start_dev.sh` for browser mode.
 
 ## Building for Distribution
 

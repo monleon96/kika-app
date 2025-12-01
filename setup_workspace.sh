@@ -1,34 +1,61 @@
 #!/bin/bash
 
-# Exit on error
-set -e
+# KIKA Desktop - Workspace Setup (Linux/WSL)
+# Sets up Python virtual environment and dependencies
+#
+# For Windows, use: setup_workspace_windows.bat
+
+set -e  # Exit on error
+
+echo "========================================"
+echo "KIKA Desktop - Workspace Setup (Linux/WSL)"
+echo "========================================"
+echo ""
 
 # Create virtual environment
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
     python3 -m venv venv
+    echo "[OK] Virtual environment created"
+else
+    echo "[OK] Virtual environment already exists"
 fi
 
 # Activate virtual environment
 source venv/bin/activate
 
 # Upgrade pip
-pip install --upgrade pip
+echo ""
+echo "Upgrading pip..."
+pip install --upgrade pip --quiet
 
 # Install backend-auth dependencies
 echo "Installing backend-auth dependencies..."
-pip install -r backend-auth/requirements.txt
+pip install -r backend-auth/requirements.txt --quiet
 
-# Install backend-core dependencies
-echo "Installing backend-core dependencies..."
-pip install -r backend-core/requirements.txt
+# Install kika-api dependencies
+echo "Installing kika-api dependencies..."
+pip install -r kika-api/requirements.txt --quiet
 
-# Install kika in editable mode
-if [ -d "/home/MONLEON-JUAN/kika" ]; then
-    echo "Installing kika in editable mode..."
-    pip install -e /home/MONLEON-JUAN/kika
-else
-    echo "Warning: /home/MONLEON-JUAN/kika not found. Skipping editable install."
-fi
+echo "[OK] Python dependencies installed"
 
-echo "Setup complete. To activate the environment, run: source venv/bin/activate"
+# Install frontend dependencies
+echo ""
+echo "Installing frontend dependencies..."
+cd frontend
+npm install
+cd ..
+echo "[OK] Frontend dependencies installed"
+
+echo ""
+echo "========================================"
+echo "Setup Complete!"
+echo "========================================"
+echo ""
+echo "To start development:"
+echo "  WSL (browser mode):  ./start_dev.sh"
+echo "  With Tauri GUI:      ./start_app.sh"
+echo ""
+echo "To activate the environment manually:"
+echo "  source venv/bin/activate"
+echo ""

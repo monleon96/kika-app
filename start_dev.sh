@@ -56,9 +56,9 @@ else
     echo "[1/3] Using CLOUD Auth Backend (https://kika-backend.onrender.com)"
 fi
 
-# Start Backend Core (port 8001)
-echo "[2/3] Starting Core Backend on http://localhost:8001"
-cd backend-core
+# Start KIKA API (port 8001)
+echo "[2/3] Starting KIKA API on http://localhost:8001"
+cd kika-api
 uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload &
 CORE_PID=$!
 cd ..

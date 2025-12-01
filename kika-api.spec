@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller spec file for KIKA Backend Core Service
+PyInstaller spec file for KIKA API Service
 Builds a standalone Windows executable for nuclear data processing
 """
 
@@ -9,22 +9,19 @@ from pathlib import Path
 
 block_cipher = None
 
-# Get the absolute path to backend-core directory
-backend_core_dir = Path('backend-core').resolve()
+# Get the absolute path to kika-api directory
+kika_api_dir = Path('kika-api').resolve()
 
-# Try to find kika library path
-kika_path = Path('/home/MONLEON-JUAN/kika')
+# Try to find kika library path (for bundling data files if needed)
 kika_datas = []
-if kika_path.exists():
-    kika_datas = [(str(kika_path), 'kika')]
 
 a = Analysis(
-    [str(backend_core_dir / 'run_server.py')],
-    pathex=[str(backend_core_dir), str(kika_path.parent) if kika_path.exists() else ''],
+    [str(kika_api_dir / 'run_server.py')],
+    pathex=[str(kika_api_dir)],
     binaries=[],
     datas=kika_datas + [
         # Include app package
-        (str(backend_core_dir / 'app'), 'app'),
+        (str(kika_api_dir / 'app'), 'app'),
     ],
     hiddenimports=[
         # Uvicorn dependencies
@@ -105,7 +102,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='kika-backend-core',
+    name='kika-api',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
