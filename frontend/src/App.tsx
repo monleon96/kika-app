@@ -5,6 +5,7 @@ import { theme } from './theme';
 import { AppRoutes } from './routes';
 import { AuthProvider } from './contexts/AuthContext';
 import { FileWorkspaceProvider } from './contexts/FileWorkspaceContext';
+import { MaterialsProvider } from './contexts/MaterialsContext';
 import { UpdateNotification } from './components/UpdateNotification';
 
 // Create a client for React Query
@@ -25,8 +26,10 @@ function App() {
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
             <FileWorkspaceProvider>
-              <AppRoutes />
-              <UpdateNotification showOnStartup={true} />
+              <MaterialsProvider>
+                <AppRoutes />
+                <UpdateNotification showOnStartup={true} />
+              </MaterialsProvider>
             </FileWorkspaceProvider>
           </AuthProvider>
         </BrowserRouter>

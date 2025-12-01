@@ -13,13 +13,14 @@ import {
   Divider,
   FormControlLabel,
   Checkbox,
+  CircularProgress,
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import kikaLogo from '@assets/logo_dark_optimized.png';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, register, loginAsGuest, user } = useAuth();
+  const { login, register, loginAsGuest } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,29 +29,43 @@ export const Login: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [autoLoggingIn, setAutoLoggingIn] = useState(false);
 
-  // Redirect to home if already logged in
-  useEffect(() => {
-    if (user) {
-      navigate('/', { replace: true });
-    }
-  }, [user, navigate]);
-
-  // Check for saved credentials on mount
+  // Check for saved credentials on mount and auto-login if "stay signed in" was checked
   useEffect(() => {
     const savedCredentials = localStorage.getItem('kika_saved_credentials');
     if (savedCredentials) {
       try {
-        const { email: savedEmail, staySignedIn: savedStaySignedIn } = JSON.parse(savedCredentials);
-        if (savedStaySignedIn && savedEmail) {
+        const { email: savedEmail, password: savedPassword, staySignedIn: savedStaySignedIn } = JSON.parse(savedCredentials);
+        if (savedStaySignedIn && savedEmail && savedPassword) {
+          // Auto-login with saved credentials
+          setAutoLoggingIn(true);
           setEmail(savedEmail);
           setStaySignedIn(true);
+          
+          // Attempt auto-login
+          login(savedEmail, savedPassword).then((result) => {
+            if (result.success) {
+              navigate('/');
+            } else {
+              // Auto-login failed, clear saved credentials and show login form
+              localStorage.removeItem('kika_saved_credentials');
+              setAutoLoggingIn(false);
+              setError('Session expired. Please sign in again.');
+            }
+          });
+        } else if (savedEmail) {
+          // Just remember the email
+          setEmail(savedEmail);
+          setStaySignedIn(savedStaySignedIn || false);
+          setAutoLoggingIn(false);
         }
       } catch (e) {
         localStorage.removeItem('kika_saved_credentials');
+        setAutoLoggingIn(false);
       }
     }
-  }, []);
+  }, [login, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,9 +99,13 @@ export const Login: React.FC = () => {
       // Login mode
       const result = await login(email, password);
       if (result.success) {
-        // Save email for "stay signed in" functionality
+        // Save credentials for "stay signed in" functionality (auto-login next time)
         if (staySignedIn) {
-          localStorage.setItem('kika_saved_credentials', JSON.stringify({ email, staySignedIn: true }));
+          localStorage.setItem('kika_saved_credentials', JSON.stringify({ 
+            email, 
+            password, // Store password for auto-login
+            staySignedIn: true 
+          }));
         } else {
           localStorage.removeItem('kika_saved_credentials');
         }
@@ -111,6 +130,28 @@ export const Login: React.FC = () => {
     loginAsGuest();
     navigate('/');
   };
+
+  // Show loading screen during auto-login
+  if (autoLoggingIn) {
+    return (
+      <Container maxWidth="sm">
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+            gap: 2,
+          }}
+        >
+          <img src={kikaLogo} alt="KIKA Logo" style={{ height: 80 }} />
+          <CircularProgress />
+          <Typography color="text.secondary">Signing in...</Typography>
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="sm">

@@ -21,6 +21,7 @@ import {
   Speed,
   Storage,
   DesktopWindows,
+  Inventory,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
@@ -223,6 +224,13 @@ export const Home: React.FC = () => {
       color: theme.palette.secondary.main,
     },
     {
+      title: 'Materials',
+      description: 'Define and manage MCNP material compositions with nuclide fractions, library specifications, and natural element expansion.',
+      icon: <Inventory sx={{ fontSize: 28 }} />,
+      onClick: () => navigate('/materials'),
+      color: theme.palette.success.main,
+    },
+    {
       title: 'NJOY Processing',
       description: 'Generate ACE files from ENDF data with temperature selection and automatic versioning.',
       icon: <Build sx={{ fontSize: 28 }} />,
@@ -417,7 +425,7 @@ export const Home: React.FC = () => {
             gridTemplateColumns: {
               xs: '1fr',
               sm: 'repeat(2, 1fr)',
-              lg: 'repeat(3, 1fr)',
+              lg: 'repeat(4, 1fr)',
             },
           }}
         >
