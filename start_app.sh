@@ -21,9 +21,9 @@ source venv/bin/activate
 # Note: Authentication is now cloud-hosted on Render (https://kika-backend.onrender.com)
 # No need to start a local auth backend
 
-# Start Core Backend (local processing server)
-echo "Starting Core Backend (Port 8001)..."
-cd backend-core
+# Start KIKA API (local processing server)
+echo "Starting KIKA API (Port 8001)..."
+cd kika-api
 uvicorn app.main:app --reload --port 8001 &
 CORE_PID=$!
 cd ..
