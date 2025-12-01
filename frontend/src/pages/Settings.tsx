@@ -28,9 +28,11 @@ import {
   VerifiedUser,
   CloudSync,
   Warning,
+  Cached,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { BACKEND_URL } from '../config';
+import { clearBackendCache } from '../services/kikaService';
 
 // Check if running in Tauri
 const isTauri = '__TAURI__' in window;
@@ -80,7 +82,27 @@ export const Settings: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  // Cache clear state
+  const [cacheLoading, setCacheLoading] = useState(false);
+  const [cacheSuccess, setCacheSuccess] = useState('');
+  const [cacheError, setCacheError] = useState('');
+
   const isGuest = user?.is_guest;
+
+  const handleClearCache = async () => {
+    setCacheLoading(true);
+    setCacheError('');
+    setCacheSuccess('');
+
+    try {
+      const result = await clearBackendCache();
+      setCacheSuccess(result.message);
+    } catch (error) {
+      setCacheError(error instanceof Error ? error.message : 'Failed to clear cache');
+    }
+
+    setCacheLoading(false);
+  };
 
   const handleRequestPasswordReset = async () => {
     if (!user || isGuest) return;
@@ -273,6 +295,39 @@ export const Settings: React.FC = () => {
             disabled={passwordLoading || !isOnline}
           >
             {passwordLoading ? 'Sending...' : 'Change Password'}
+          </Button>
+        </Paper>
+
+        {/* Cache Management Section */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Cached /> Cache Management
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          {cacheSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {cacheSuccess}
+            </Alert>
+          )}
+          {cacheError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {cacheError}
+            </Alert>
+          )}
+
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Clear the backend cache if you're experiencing issues with file processing. 
+            This will force files to be re-parsed on next use.
+          </Typography>
+
+          <Button
+            variant="outlined"
+            startIcon={<Cached />}
+            onClick={handleClearCache}
+            disabled={cacheLoading}
+          >
+            {cacheLoading ? 'Clearing...' : 'Clear Backend Cache'}
           </Button>
         </Paper>
 

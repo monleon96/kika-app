@@ -24,13 +24,9 @@ async def export_with_matplotlib(request: MatplotlibExportRequest):
     try:
         fig_settings = request.figure_settings
         
-        # Support both figWidthInches/figHeightInches (from frontend) and width/height (legacy)
-        if 'figWidthInches' in fig_settings:
-            fig_width = fig_settings.get('figWidthInches', 8)
-            fig_height = fig_settings.get('figHeightInches', 5)
-        else:
-            fig_width = fig_settings.get('width', 900) / 100  # Convert px to inches (assuming 100 dpi)
-            fig_height = fig_settings.get('height', 580) / 100
+        # Extract figure size
+        fig_width = fig_settings.get('width', 900) / 100  # Convert px to inches (assuming 100 dpi)
+        fig_height = fig_settings.get('height', 580) / 100
         
         # Create PlotBuilder with style
         builder = PlotBuilder(
@@ -182,13 +178,8 @@ async def export_endf_with_matplotlib(request: ENDFMatplotlibExportRequest):
 
     try:
         fig_settings = request.figure_settings
-        # Support both figWidthInches/figHeightInches (from frontend) and width/height (legacy)
-        if 'figWidthInches' in fig_settings:
-            fig_width = fig_settings.get('figWidthInches', 8)
-            fig_height = fig_settings.get('figHeightInches', 5)
-        else:
-            fig_width = fig_settings.get('width', 900) / 100
-            fig_height = fig_settings.get('height', 580) / 100
+        fig_width = fig_settings.get('width', 900) / 100
+        fig_height = fig_settings.get('height', 580) / 100
 
         builder = PlotBuilder(
             style=request.style,
@@ -203,7 +194,7 @@ async def export_endf_with_matplotlib(request: ENDFMatplotlibExportRequest):
             _, endf_obj, _ = load_endf_object(
                 file_id=series_config.file_id,
                 file_content=series_config.file_content,
-                file_name=series_config.file_name,
+                file_name=getattr(series_config, "file_name", None),
             )
 
             data_type = series_config.data_type.lower()

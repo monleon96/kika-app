@@ -33,6 +33,12 @@ def _get_cached_endf_entry(file_id: str):
         entry["timestamp"] = time.time()
     return entry
 
+def clear_endf_cache() -> int:
+    """Clear all cached ENDF objects. Returns the number of items cleared."""
+    count = len(ENDF_CACHE)
+    ENDF_CACHE.clear()
+    return count
+
 def _parse_endf_content(file_content: str, file_name: str):
     """Parse ENDF content string into an ENDF object."""
     tmp_path = None

@@ -34,6 +34,12 @@ def _get_cached_ace_entry(file_id: str):
         entry["timestamp"] = time.time()
     return entry
 
+def clear_ace_cache() -> int:
+    """Clear all cached ACE objects. Returns the number of items cleared."""
+    count = len(ACE_CACHE)
+    ACE_CACHE.clear()
+    return count
+
 def _parse_ace_content(file_content: str, file_name: str):
     """Parse ACE content string into an ACE object."""
     tmp_path = None

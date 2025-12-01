@@ -15,6 +15,14 @@ trap cleanup SIGINT
 
 echo "Starting KIKA App..."
 
+# Kill any existing processes on the ports we need
+echo "Checking for existing processes..."
+pkill -f "uvicorn app.main" 2>/dev/null && echo "Killed existing uvicorn process" || echo "No existing uvicorn process"
+pkill -f "npm run tauri" 2>/dev/null && echo "Killed existing Tauri process" || echo "No existing Tauri process"
+
+# Give processes time to clean up
+sleep 2
+
 # Activate virtual environment
 source venv/bin/activate
 

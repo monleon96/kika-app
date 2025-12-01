@@ -7,9 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .models import ACEParseRequest, FileTypeDetectionResponse
 from .services.detection_service import detect_file_type
+from .services.ace_service import clear_ace_cache
+from .services.endf_service import clear_endf_cache
 from .routers import ace, endf, plot
 
 __version__ = "1.0.1"
+
+# Try to get kika library version
+try:
+    import kika
+    KIKA_LIB_VERSION = getattr(kika, '__version__', 'unknown')
+except ImportError:
+    KIKA_LIB_VERSION = 'not installed'
 
 app = FastAPI(title="KIKA Processing Server", version=__version__)
 
@@ -43,7 +52,26 @@ async def root():
 @app.get("/healthz")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "version": __version__}
+    return {
+        "status": "healthy",
+        "version": __version__,
+        "kika_lib_version": KIKA_LIB_VERSION
+    }
+
+@app.post("/api/cache/clear")
+async def clear_cache():
+    """
+    Clear all cached ACE and ENDF objects from memory.
+    Useful for debugging and forcing re-parsing of files.
+    """
+    ace_cleared = clear_ace_cache()
+    endf_cleared = clear_endf_cache()
+    return {
+        "status": "success",
+        "ace_items_cleared": ace_cleared,
+        "endf_items_cleared": endf_cleared,
+        "message": f"Cleared {ace_cleared} ACE and {endf_cleared} ENDF cached items"
+    }
 
 @app.post("/api/detect-file-type", response_model=FileTypeDetectionResponse)
 async def detect_file_type_endpoint(request: ACEParseRequest):

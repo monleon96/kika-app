@@ -104,6 +104,32 @@ export async function checkKIKAHealth(): Promise<boolean> {
   }
 }
 
+export interface CacheClearResponse {
+  status: string;
+  ace_items_cleared: number;
+  endf_items_cleared: number;
+  message: string;
+}
+
+/**
+ * Clear all cached ACE and ENDF objects from the backend
+ */
+export async function clearBackendCache(): Promise<CacheClearResponse> {
+  const response = await fetch(`${KIKA_SERVER_URL}/api/cache/clear`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to clear cache');
+  }
+
+  return response.json();
+}
+
 /**
  * Parse ACE file and get basic information
  */

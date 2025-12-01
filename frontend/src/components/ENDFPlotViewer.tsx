@@ -484,6 +484,12 @@ export const ENDFPlotViewer: React.FC<ENDFPlotViewerProps> = ({ files, onReuploa
           );
         })
         .catch((error) => {
+          console.error('[ENDFPlotViewer] ❌ Error fetching series data:', {
+            seriesId: series.id,
+            error,
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            errorStack: error instanceof Error ? error.stack : undefined,
+          });
           setSeriesDataMap((prev) => ({
             ...prev,
             [series.id]: {

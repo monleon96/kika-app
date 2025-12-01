@@ -24,6 +24,7 @@ export interface DiagnosticInfo {
   coreBackendStatus: 'online' | 'offline' | 'error';
   coreBackendError?: string;
   coreBackendVersion?: string;
+  kikaLibVersion?: string;
   sidecarStatus?: string;
 }
 
@@ -84,6 +85,7 @@ export async function getDiagnosticInfo(): Promise<DiagnosticInfo> {
   }
   
   // Check core backend (local sidecar - no CORS issues)
+  let kikaLibVersion: string | undefined;
   try {
     const coreResponse = await fetch(`${KIKA_SERVER_URL}/healthz`, {
       method: 'GET',
@@ -94,6 +96,7 @@ export async function getDiagnosticInfo(): Promise<DiagnosticInfo> {
       try {
         const data = await coreResponse.json();
         coreVersion = data.version || 'unknown';
+        kikaLibVersion = data.kika_lib_version || 'unknown';
       } catch {
         coreVersion = 'unknown';
       }
@@ -116,6 +119,7 @@ export async function getDiagnosticInfo(): Promise<DiagnosticInfo> {
     coreBackendStatus: coreStatus,
     coreBackendError: coreError,
     coreBackendVersion: coreVersion,
+    kikaLibVersion,
     sidecarStatus,
   };
 }

@@ -19,7 +19,7 @@ import kikaLogo from '@assets/logo_dark_optimized.png';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, register, loginAsGuest } = useAuth();
+  const { login, register, loginAsGuest, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,6 +28,13 @@ export const Login: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
+
+  // Redirect to home if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
 
   // Check for saved credentials on mount
   useEffect(() => {

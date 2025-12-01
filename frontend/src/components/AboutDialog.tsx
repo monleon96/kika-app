@@ -57,6 +57,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ open, onClose }) => {
     const text = `KIKA Diagnostic Info
 ====================
 App Version: ${diagnostics.appVersion}
+KIKA Library Version: ${diagnostics.kikaLibVersion || 'N/A'}
 Running in Tauri: ${diagnostics.isTauri}
 ${diagnostics.sidecarStatus ? `Sidecar Status: ${diagnostics.sidecarStatus}` : ''}
 
@@ -109,18 +110,24 @@ Core Backend:
               <Typography variant="subtitle1" color="text.secondary">
                 Nuclear Data Visualization Tool
               </Typography>
-              <Chip 
-                label={`v${diagnostics.appVersion}`} 
-                color="primary" 
-                sx={{ mt: 1 }} 
-              />
-              {diagnostics.isTauri && (
+              <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
                 <Chip 
-                  label="Desktop App" 
-                  variant="outlined" 
-                  sx={{ mt: 1, ml: 1 }} 
+                  label={`App v${diagnostics.appVersion}`} 
+                  color="primary" 
                 />
-              )}
+                {diagnostics.kikaLibVersion && diagnostics.kikaLibVersion !== 'unknown' && (
+                  <Chip 
+                    label={`kika lib v${diagnostics.kikaLibVersion}`} 
+                    color="secondary"
+                  />
+                )}
+                {diagnostics.isTauri && (
+                  <Chip 
+                    label="Desktop App" 
+                    variant="outlined"
+                  />
+                )}
+              </Box>
             </Box>
 
             <Divider sx={{ my: 2 }} />

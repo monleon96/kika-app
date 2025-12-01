@@ -247,6 +247,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('kikaAcePlotterConfigs'); // ACE plot configs
     localStorage.removeItem('kikaEndfViewerConfigs'); // ENDF plot configs
     localStorage.removeItem('workspaceFiles'); // Legacy file storage
+    // Clear saved credentials so user can log in with a different account
+    localStorage.removeItem('kika_saved_credentials');
   };
 
   return (
