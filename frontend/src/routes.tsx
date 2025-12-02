@@ -10,6 +10,11 @@ import { ENDFFiles } from './pages/ENDFFiles';
 import { ENDFFilePage } from './pages/ENDFFilePage';
 import { ENDFPlotter } from './pages/ENDFPlotter';
 import { ENDFDataSection } from './pages/ENDFDataSection';
+import { MCNPInputFiles } from './pages/MCNPInputFiles';
+import { MCNPInputFilePage } from './pages/MCNPInputFilePage';
+import { MCTALFiles } from './pages/MCTALFiles';
+import { MCTALFilePage } from './pages/MCTALFilePage';
+import { MCNPPage } from './pages/MCNPPage';
 import { Materials } from './pages/Materials';
 import { MaterialDetail } from './pages/MaterialDetail';
 import { MaterialEditor } from './pages/MaterialEditor';
@@ -55,6 +60,11 @@ export const AppRoutes: React.FC = () => {
         <Route path="endf-files/plotter" element={<ENDFPlotter />} />
         <Route path="endf-files/:fileId" element={<ENDFFilePage />} />
         <Route path="endf-files/:fileId/:section" element={<ENDFDataSection />} />
+        <Route path="mcnp" element={<MCNPPage />} />
+        <Route path="mcnp-input" element={<MCNPInputFiles />} />
+        <Route path="mcnp-input/:fileId" element={<MCNPInputFilePage />} />
+        <Route path="mcnp-mctal" element={<MCTALFiles />} />
+        <Route path="mcnp-mctal/:fileId" element={<MCTALFilePage />} />
         <Route path="materials" element={<Materials />} />
         <Route path="materials/create" element={<MaterialEditor />} />
         <Route path="materials/import" element={<MaterialEditor />} />

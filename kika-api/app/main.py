@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .models import ACEParseRequest, FileTypeDetectionResponse
 from .services.detection_service import detect_file_type
-from .routers import ace, endf, plot, materials
+from .routers import ace, endf, plot, materials, mcnp
 
 __version__ = "1.0.1"
 
@@ -32,6 +32,7 @@ app.include_router(ace.router)
 app.include_router(endf.router)
 app.include_router(plot.router)
 app.include_router(materials.router)
+app.include_router(mcnp.router)
 
 @app.get("/")
 async def root():

@@ -1,7 +1,7 @@
 /**
  * File types supported by the application
  */
-export type FileType = 'ace' | 'endf';
+export type FileType = 'ace' | 'endf' | 'mcnp-input' | 'mcnp-mctal';
 
 /**
  * Status of file detection/parsing
@@ -22,7 +22,7 @@ export interface WorkspaceFile {
   size: number;
   uploadedAt: Date;
   error?: string;
-  metadata?: ACEMetadata | ENDFMetadata;
+  metadata?: ACEMetadata | ENDFMetadata | MCNPInputMetadata | MCTALMetadata;
 }
 
 /**
@@ -55,6 +55,92 @@ export interface ENDFMetadata {
   // New: explicit available orders per MT for MF4 and MF34 (optional for backward-compat)
   available_orders_mf4_by_mt?: Record<string, number[]>;
   available_orders_mf34_by_mt?: Record<string, number[]>;
+}
+
+/**
+ * MCNP Input file metadata from parsing
+ */
+export interface MCNPInputMetadata {
+  file_id: string;
+  /** Number of materials defined in the input */
+  material_count: number;
+  /** Material IDs found in the input */
+  material_ids: number[];
+  /** Number of PERT cards defined */
+  pert_count: number;
+  /** PERT card IDs */
+  pert_ids: number[];
+  /** Summary info about materials (id -> brief description) */
+  materials_summary: Record<number, MaterialSummary>;
+  /** Detailed material info for import (id -> full details) */
+  materials_detail?: Record<number, MaterialDetail>;
+}
+
+/**
+ * Brief summary of a material for display
+ */
+export interface MaterialSummary {
+  id: number;
+  nuclide_count: number;
+  density?: number;
+}
+
+/**
+ * Detailed material info for import to Materials library
+ */
+export interface MaterialDetail {
+  id: number;
+  name: string;
+  nuclide_count: number;
+  density?: number;
+  fraction_type: 'atomic' | 'weight';
+  nuclides: MaterialNuclide[];
+}
+
+/**
+ * Nuclide in a material
+ */
+export interface MaterialNuclide {
+  zaid: string;
+  fraction: number;
+  nlib?: string;
+  plib?: string;
+}
+
+/**
+ * MCTAL file metadata from parsing
+ */
+export interface MCTALMetadata {
+  file_id: string;
+  /** Code name (e.g., "mcnp") */
+  code_name: string;
+  /** Version string */
+  version: string;
+  /** Problem identification */
+  problem_id: string;
+  /** Number of particles run (nps) */
+  nps: number;
+  /** Number of tallies in the file */
+  tally_count: number;
+  /** List of tally numbers */
+  tally_numbers: number[];
+  /** Number of perturbations (npert) */
+  npert: number;
+  /** Summary info about tallies (number -> brief description) */
+  tallies_summary: Record<number, TallySummary>;
+}
+
+/**
+ * Brief summary of a tally for display
+ */
+export interface TallySummary {
+  id: number;
+  name?: string;
+  n_cells_surfaces: number;
+  n_energy_bins: number;
+  has_perturbations: boolean;
+  result?: number;
+  error?: number;
 }
 
 /**

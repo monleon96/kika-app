@@ -30,16 +30,13 @@ def _material_data_to_dict(data: MaterialData) -> dict:
     """Convert Pydantic MaterialData to dictionary for service layer."""
     return {
         'material_id': data.material_id,
-        'nlib': data.nlib,
-        'plib': data.plib,
-        'ylib': data.ylib,
+        'fraction_type': data.fraction_type,
+        'libs': data.libs,
         'nuclides': [
             {
                 'zaid': n.zaid,
                 'fraction': n.fraction,
-                'nlib': n.nlib,
-                'plib': n.plib,
-                'ylib': n.ylib,
+                'libs': n.libs,
             }
             for n in data.nuclides
         ]
@@ -50,16 +47,13 @@ def _dict_to_material_data(d: dict) -> MaterialData:
     """Convert dictionary to MaterialData Pydantic model."""
     return MaterialData(
         material_id=d['material_id'],
-        nlib=d.get('nlib'),
-        plib=d.get('plib'),
-        ylib=d.get('ylib'),
+        fraction_type=d.get('fraction_type', 'ao'),
+        libs=d.get('libs', {}),
         nuclides=[
             NuclideData(
                 zaid=n['zaid'],
                 fraction=n['fraction'],
-                nlib=n.get('nlib'),
-                plib=n.get('plib'),
-                ylib=n.get('ylib'),
+                libs=n.get('libs', {}),
             )
             for n in d.get('nuclides', [])
         ]
@@ -120,14 +114,14 @@ async def expand_natural_elements(request: ExpandNaturalRequest):
     Natural elements have ZAIDs ending in '00' (e.g., 6000 for natural carbon).
     This expands them to specific isotopes based on natural abundance data.
     
-    If zaids_to_expand is provided, only those specific ZAIDs are expanded.
+    If elements_to_expand is provided (e.g., ['Fe', 'C']), only those specific elements are expanded.
     Otherwise, all natural elements in the material are expanded.
     """
     try:
         material_dict = _material_data_to_dict(request.material)
         result = material_service.expand_natural_elements(
             material_dict, 
-            zaids_to_expand=request.zaids_to_expand
+            elements_to_expand=request.elements_to_expand
         )
         return MaterialConvertResponse(material=_dict_to_material_data(result))
     except ValueError as e:

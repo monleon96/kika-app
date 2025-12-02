@@ -377,34 +377,91 @@ export const Materials: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" fontWeight={600} gutterBottom>
-            Materials
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage your material definitions
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<ImportIcon />}
-            onClick={() => navigate('/materials/import')}
-          >
-            Import from MCNP
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/materials/create')}
-          >
-            New Material
-          </Button>
-        </Box>
-      </Box>
+    <Box sx={{ width: '100%', minHeight: '100%' }}>
+      {/* Hero Section */}
+      <Fade in timeout={500}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 4,
+            mb: 4,
+            borderRadius: 4,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.secondary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.12)} 100%)`,
+            position: 'relative',
+            overflow: 'hidden',
+            border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: -80,
+              right: -80,
+              width: 200,
+              height: 200,
+              borderRadius: '50%',
+              background: alpha(theme.palette.secondary.main, 0.15),
+              filter: 'blur(50px)',
+            },
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: -60,
+              left: -60,
+              width: 150,
+              height: 150,
+              borderRadius: '50%',
+              background: alpha(theme.palette.primary.main, 0.1),
+              filter: 'blur(40px)',
+            },
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 3,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: alpha(theme.palette.secondary.main, 0.15),
+                    color: theme.palette.secondary.main,
+                  }}
+                >
+                  <ScienceIcon sx={{ fontSize: 32 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h4" fontWeight={700}>
+                    Materials
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Manage your material definitions and compositions
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<ImportIcon />}
+                  onClick={() => navigate('/materials/import')}
+                  sx={{ borderColor: alpha(theme.palette.secondary.main, 0.5) }}
+                >
+                  Import from MCNP
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => navigate('/materials/create')}
+                  color="secondary"
+                >
+                  New Material
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+        </Paper>
+      </Fade>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

@@ -15,7 +15,7 @@ kika_path = Path(__file__).resolve().parents[4] / 'kika'
 if str(kika_path) not in sys.path:
     sys.path.insert(0, str(kika_path))
 
-from kika.input.material import Materials, Mat, Nuclide
+from kika.input.material import MaterialCollection, Material, Nuclide
 from kika.input.parse_materials import read_material
 
 
@@ -49,52 +49,65 @@ def parse_mcnp_materials(content: str) -> List[Dict[str, Any]]:
     return materials_data
 
 
-def _mat_to_dict(mat: Mat) -> Dict[str, Any]:
-    """Convert a Mat object to a serializable dictionary.
+def _mat_to_dict(mat: Material) -> Dict[str, Any]:
+    """Convert a Material object to a serializable dictionary.
     
     :param mat: Material object from kika
     :returns: Dictionary representation of the material
     """
     nuclides = []
-    for zaid, nuclide in mat.nuclide.items():
+    for symbol, nuclide in mat.nuclide.items():
         nuclides.append({
             'zaid': nuclide.zaid,
+            'symbol': symbol,
             'fraction': nuclide.fraction,
-            'nlib': nuclide.nlib,
-            'plib': nuclide.plib,
-            'ylib': nuclide.ylib,
+            'libs': dict(nuclide.libs) if nuclide.libs else {},
         })
     
     return {
         'material_id': mat.id,
-        'nlib': mat.nlib,
-        'plib': mat.plib,
-        'ylib': mat.ylib,
+        'name': mat.name,
+        'fraction_type': mat.fraction_type,  # 'ao' or 'wo'
+        'libs': dict(mat.libs) if mat.libs else {},
+        'density': mat.density,
+        'density_unit': mat.density_unit,
+        'temperature': mat.temperature,
         'nuclides': nuclides,
     }
 
 
-def _dict_to_mat(data: Dict[str, Any]) -> Mat:
-    """Convert a dictionary to a Mat object.
+def _dict_to_mat(data: Dict[str, Any]) -> Material:
+    """Convert a dictionary to a Material object.
     
     :param data: Dictionary with material data
-    :returns: Mat object
+    :returns: Material object
     """
-    mat = Mat(
-        id=data['material_id'],
-        nlib=data.get('nlib'),
-        plib=data.get('plib'),
-        ylib=data.get('ylib'),
-    )
-    
+    # Build nuclides dict keyed by symbol
+    nuclides_dict = {}
     for nuc_data in data.get('nuclides', []):
-        mat.nuclide[nuc_data['zaid']] = Nuclide(
-            zaid=nuc_data['zaid'],
-            fraction=nuc_data['fraction'],
-            nlib=nuc_data.get('nlib'),
-            plib=nuc_data.get('plib'),
-            ylib=nuc_data.get('ylib'),
+        zaid = nuc_data['zaid']
+        # Use symbol if available, otherwise generate from zaid
+        symbol = nuc_data.get('symbol')
+        if not symbol:
+            from kika._utils import zaid_to_symbol
+            symbol = zaid_to_symbol(zaid)
+        
+        nuclides_dict[symbol] = Nuclide(
+            zaid=zaid,
+            fraction=abs(nuc_data['fraction']),  # Store as positive
+            libs=dict(nuc_data.get('libs', {})),
         )
+    
+    mat = Material(
+        id=data['material_id'],
+        nuclide=nuclides_dict,
+        libs=dict(data.get('libs', {})),
+        name=data.get('name'),
+        fraction_type=data.get('fraction_type', 'ao'),
+        density=data.get('density'),
+        density_unit=data.get('density_unit'),
+        temperature=data.get('temperature'),
+    )
     
     return mat
 
@@ -123,17 +136,17 @@ def convert_to_atomic_fractions(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def expand_natural_elements(
     data: Dict[str, Any], 
-    zaids_to_expand: Optional[List[int]] = None
+    elements_to_expand: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """Expand natural elements into their constituent isotopes.
     
     :param data: Material dictionary
-    :param zaids_to_expand: Optional list of specific ZAIDs to expand.
-                           If None, expands all natural elements.
+    :param elements_to_expand: Optional list of element symbols to expand (e.g., ['Fe', 'C']).
+                              If None, expands all natural elements.
     :returns: Material dictionary with expanded isotopes
     """
     mat = _dict_to_mat(data)
-    mat.convert_natural_elements(zaid_to_expand=zaids_to_expand)
+    mat.expand_natural_elements(elements=elements_to_expand)
     return _mat_to_dict(mat)
 
 
@@ -144,7 +157,7 @@ def to_mcnp_format(data: Dict[str, Any]) -> str:
     :returns: MCNP formatted material card string
     """
     mat = _dict_to_mat(data)
-    return str(mat)
+    return mat.to_mcnp()
 
 
 def get_material_info(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -155,31 +168,34 @@ def get_material_info(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     mat = _dict_to_mat(data)
     
-    # Determine fraction type
-    is_weight = any(nuc.fraction < 0 for nuc in mat.nuclide.values())
-    fraction_type = "weight" if is_weight else "atomic"
+    # Determine fraction type from material property
+    fraction_type = "weight" if mat.is_weight else "atomic"
     
     # Count natural elements
     natural_elements = [
-        zaid for zaid in mat.nuclide.keys() 
-        if zaid % 1000 == 0 and zaid > 1000
+        nuclide.zaid for nuclide in mat.nuclide.values() 
+        if nuclide.is_natural
     ]
     
     # Get unique elements
     elements = set()
-    for zaid in mat.nuclide.keys():
-        z = zaid // 1000
+    for nuclide in mat.nuclide.values():
+        z = nuclide.zaid // 1000
         if z > 0:
             elements.add(z)
     
     return {
         'material_id': mat.id,
+        'name': mat.name,
         'nuclide_count': len(mat.nuclide),
         'fraction_type': fraction_type,
         'natural_element_count': len(natural_elements),
         'natural_elements': natural_elements,
         'unique_elements': sorted(list(elements)),
-        'has_libraries': bool(mat.nlib or mat.plib or mat.ylib),
+        'has_libraries': bool(mat.libs),
+        'density': mat.density,
+        'density_unit': mat.density_unit,
+        'temperature': mat.temperature,
     }
 
 
@@ -194,11 +210,12 @@ def add_nuclide_to_material(
     :param data: Material dictionary
     :param zaid: ZAID of nuclide to add
     :param fraction: Atomic or weight fraction
-    :param library: Optional specific library
+    :param library: Optional specific library suffix (e.g., '80c')
     :returns: Updated material dictionary
     """
     mat = _dict_to_mat(data)
-    mat.add_nuclide(zaid=zaid, fraction=fraction, library=library)
+    # Use the material's current fraction type
+    mat.add_nuclide(nuclide=zaid, fraction=fraction, fraction_type=mat.fraction_type, library=library)
     return _mat_to_dict(mat)
 
 
@@ -214,7 +231,10 @@ def remove_nuclide_from_material(
     :raises KeyError: If ZAID not found in material
     """
     mat = _dict_to_mat(data)
-    if zaid not in mat.nuclide:
-        raise KeyError(f"ZAID {zaid} not found in material")
-    del mat.nuclide[zaid]
+    # Convert ZAID to symbol for lookup
+    from kika._utils import zaid_to_symbol
+    symbol = zaid_to_symbol(zaid)
+    if symbol not in mat.nuclide:
+        raise KeyError(f"ZAID {zaid} (symbol {symbol}) not found in material")
+    del mat.nuclide[symbol]
     return _mat_to_dict(mat)

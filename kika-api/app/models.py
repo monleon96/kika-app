@@ -108,17 +108,14 @@ class NuclideData(BaseModel):
     """Schema for a single nuclide in a material"""
     zaid: int
     fraction: float
-    nlib: Optional[str] = None
-    plib: Optional[str] = None
-    ylib: Optional[str] = None
+    libs: Dict[str, str] = {}  # e.g. {'n': '80c', 'p': '04p'}
 
 
 class MaterialData(BaseModel):
     """Schema for material data"""
     material_id: int
-    nlib: Optional[str] = None
-    plib: Optional[str] = None
-    ylib: Optional[str] = None
+    fraction_type: str = 'ao'  # 'ao' (atomic) or 'wo' (weight)
+    libs: Dict[str, str] = {}  # Material-level library defaults
     nuclides: List[NuclideData] = []
 
 
@@ -147,7 +144,7 @@ class MaterialConvertResponse(BaseModel):
 class ExpandNaturalRequest(BaseModel):
     """Request to expand natural elements in a material"""
     material: MaterialData
-    zaids_to_expand: Optional[List[int]] = None
+    elements_to_expand: Optional[List[str]] = None  # Element symbols like ['Fe', 'C']
 
 
 class MaterialExportRequest(BaseModel):
@@ -238,3 +235,83 @@ class ENDFMatplotlibExportRequest(BaseModel):
     style: str = "publication"
     export_format: str = "png"
     dpi: int = 300
+
+
+# ============================================================================
+# MCNP Input File Models
+# ============================================================================
+
+class MCNPInputParseRequest(BaseModel):
+    """Request to parse MCNP input file content"""
+    file_content: str
+    file_name: str = "input.i"
+
+
+class MaterialSummary(BaseModel):
+    """Brief summary of a material"""
+    id: int
+    nuclide_count: int
+    density: Optional[float] = None
+
+
+class MaterialNuclideDetail(BaseModel):
+    """Nuclide detail for material export"""
+    zaid: str
+    fraction: float
+    nlib: Optional[str] = None
+    plib: Optional[str] = None
+
+
+class MaterialDetail(BaseModel):
+    """Detailed material information for import functionality"""
+    id: int
+    name: str
+    nuclide_count: int
+    density: Optional[float] = None
+    fraction_type: str = "atomic"  # 'atomic' or 'weight'
+    nuclides: List[MaterialNuclideDetail] = []
+
+
+class MCNPInputInfoResponse(BaseModel):
+    """Response with MCNP input file information"""
+    file_id: str
+    material_count: int
+    material_ids: List[int]
+    pert_count: int
+    pert_ids: List[int]
+    materials_summary: Dict[int, MaterialSummary]
+    materials_detail: Optional[Dict[int, MaterialDetail]] = None
+
+
+# ============================================================================
+# MCTAL File Models
+# ============================================================================
+
+class MCTALParseRequest(BaseModel):
+    """Request to parse MCTAL file content"""
+    file_content: str
+    file_name: str = "output.m"
+
+
+class TallySummary(BaseModel):
+    """Brief summary of a tally"""
+    id: int
+    name: Optional[str] = ""
+    n_cells_surfaces: int
+    n_energy_bins: int
+    has_perturbations: bool
+    result: Optional[float] = None
+    error: Optional[float] = None
+
+
+class MCTALInfoResponse(BaseModel):
+    """Response with MCTAL file information"""
+    file_id: str
+    code_name: str
+    version: str
+    problem_id: str
+    nps: int
+    tally_count: int
+    tally_numbers: List[int]
+    npert: int
+    tallies_summary: Dict[int, TallySummary]

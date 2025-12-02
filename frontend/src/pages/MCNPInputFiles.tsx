@@ -14,71 +14,39 @@ import {
   Fade,
   Grow,
   Grid,
-  IconButton,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
 } from '@mui/material';
 import {
-  Timeline,
-  ShowChart,
+  Code,
   UploadFile,
   Folder,
   ArrowForward,
-  Info,
-  Compare,
-  Download,
-  ErrorOutline,
-  MoreVert,
-  Delete,
-  OpenInNew,
+  Description,
+  Analytics,
+  Calculate,
+  Lock,
 } from '@mui/icons-material';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
-import type { WorkspaceFile, ENDFMetadata, FileType } from '../types/file';
+import type { WorkspaceFile, MCNPInputMetadata, FileType } from '../types/file';
 import { FileTypeSelectionDialog } from '../components/FileTypeSelectionDialog';
 
 // Check if running in Tauri
 const isTauri = '__TAURI__' in window;
 
-// Type guard for ENDF metadata
-const isENDFMetadata = (metadata?: WorkspaceFile['metadata']): metadata is ENDFMetadata => {
-  return Boolean(metadata && 'angular_mts' in metadata);
-};
-
-// ENDF File Card Component
-interface ENDFFileCardProps {
+// MCNP Input File Card Component
+interface MCNPInputFileCardProps {
   file: WorkspaceFile;
   onClick: () => void;
-  onDelete: (file: WorkspaceFile) => void;
   delay?: number;
 }
 
-const ENDFFileCard: React.FC<ENDFFileCardProps> = ({ file, onClick, onDelete, delay = 0 }) => {
+const MCNPInputFileCard: React.FC<MCNPInputFileCardProps> = ({ file, onClick, delay = 0 }) => {
   const theme = useTheme();
   const [hovered, setHovered] = useState(false);
-  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   
-  const metadata = isENDFMetadata(file.metadata) ? file.metadata : null;
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    event.stopPropagation();
-    setMenuAnchor(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setMenuAnchor(null);
-  };
-
-  const handleDelete = () => {
-    handleMenuClose();
-    onDelete(file);
-  };
+  // Type guard for MCNP Input metadata
+  const metadata = file.metadata && 'material_count' in file.metadata 
+    ? file.metadata as MCNPInputMetadata 
+    : null;
 
   return (
     <Grow in timeout={400 + delay}>
@@ -92,7 +60,7 @@ const ENDFFileCard: React.FC<ENDFFileCardProps> = ({ file, onClick, onDelete, de
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           transform: hovered ? 'translateY(-6px)' : 'translateY(0)',
           boxShadow: hovered
-            ? `0 16px 32px ${alpha(theme.palette.secondary.main, 0.2)}`
+            ? `0 16px 32px ${alpha(theme.palette.info.main, 0.2)}`
             : theme.shadows[2],
           '&::before': {
             content: '""',
@@ -101,41 +69,13 @@ const ENDFFileCard: React.FC<ENDFFileCardProps> = ({ file, onClick, onDelete, de
             left: 0,
             right: 0,
             height: 4,
-            background: `linear-gradient(90deg, ${theme.palette.secondary.main}, ${alpha(theme.palette.secondary.main, 0.6)})`,
+            background: `linear-gradient(90deg, ${theme.palette.info.main}, ${alpha(theme.palette.info.main, 0.6)})`,
             borderRadius: '12px 12px 0 0',
           },
         }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        {/* Menu button moved outside CardActionArea to avoid DOM nesting issue */}
-        <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}>
-          <IconButton
-            size="small"
-            onClick={handleMenuOpen}
-            sx={{ 
-              opacity: hovered ? 1 : 0,
-              transition: 'opacity 0.2s ease',
-            }}
-          >
-            <MoreVert fontSize="small" />
-          </IconButton>
-          <Menu
-            anchorEl={menuAnchor}
-            open={Boolean(menuAnchor)}
-            onClose={handleMenuClose}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MenuItem onClick={() => { handleMenuClose(); onClick(); }}>
-              <ListItemIcon><OpenInNew fontSize="small" /></ListItemIcon>
-              <ListItemText>Open</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
-              <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
-              <ListItemText>Delete</ListItemText>
-            </MenuItem>
-          </Menu>
-        </Box>
         <CardActionArea
           onClick={onClick}
           sx={{
@@ -155,59 +95,43 @@ const ENDFFileCard: React.FC<ENDFFileCardProps> = ({ file, onClick, onDelete, de
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                color: theme.palette.secondary.main,
+                bgcolor: alpha(theme.palette.info.main, 0.1),
+                color: theme.palette.info.main,
                 transition: 'all 0.3s ease',
                 transform: hovered ? 'scale(1.1)' : 'scale(1)',
               }}
             >
-              <Timeline sx={{ fontSize: 24 }} />
+              <Code sx={{ fontSize: 24 }} />
             </Box>
-            <Box sx={{ flex: 1, minWidth: 0, pr: 4 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="subtitle1" fontWeight={600} noWrap>
                 {file.displayName}
               </Typography>
-              {metadata?.isotope && (
-                <Typography variant="caption" color="text.secondary">
-                  {metadata.isotope}
-                </Typography>
-              )}
+              <Typography variant="caption" color="text.secondary">
+                MCNP Input
+              </Typography>
             </Box>
           </Box>
 
           {metadata && (
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
-              {metadata.has_mf4 && (
+              <Chip
+                label={`${metadata.material_count} materials`}
+                size="small"
+                sx={{ 
+                  bgcolor: alpha(theme.palette.success.main, 0.1),
+                  color: theme.palette.success.main,
+                  fontSize: '0.7rem',
+                  height: 24,
+                }}
+              />
+              {metadata.pert_count > 0 && (
                 <Chip
-                  label="MF4"
+                  label={`${metadata.pert_count} PERT cards`}
                   size="small"
                   sx={{ 
-                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                    color: theme.palette.primary.main,
-                    fontSize: '0.7rem',
-                    height: 24,
-                  }}
-                />
-              )}
-              {metadata.has_mf34 && (
-                <Chip
-                  label="MF34"
-                  size="small"
-                  sx={{ 
-                    bgcolor: alpha(theme.palette.info.main, 0.1),
-                    color: theme.palette.info.main,
-                    fontSize: '0.7rem',
-                    height: 24,
-                  }}
-                />
-              )}
-              {metadata.angular_mts.length > 0 && (
-                <Chip
-                  label={`${metadata.angular_mts.length} MTs`}
-                  size="small"
-                  sx={{ 
-                    bgcolor: alpha(theme.palette.success.main, 0.1),
-                    color: theme.palette.success.main,
+                    bgcolor: alpha(theme.palette.warning.main, 0.1),
+                    color: theme.palette.warning.main,
                     fontSize: '0.7rem',
                     height: 24,
                   }}
@@ -220,7 +144,7 @@ const ENDFFileCard: React.FC<ENDFFileCardProps> = ({ file, onClick, onDelete, de
             sx={{
               display: 'flex',
               alignItems: 'center',
-              color: theme.palette.secondary.main,
+              color: theme.palette.info.main,
               fontWeight: 500,
               fontSize: '0.875rem',
               mt: 'auto',
@@ -255,8 +179,8 @@ const Feature: React.FC<FeatureProps> = ({ icon, title, description }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: alpha(theme.palette.secondary.main, 0.1),
-          color: theme.palette.secondary.main,
+          bgcolor: alpha(theme.palette.info.main, 0.1),
+          color: theme.palette.info.main,
           flexShrink: 0,
         }}
       >
@@ -285,17 +209,17 @@ const UploadPrompt: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const processedErrorsRef = useRef<Set<string>>(new Set());
 
-  // Monitor for ENDF parse errors to show fallback dialog
+  // Monitor for MCNP Input parse errors to show fallback dialog
   useEffect(() => {
-    const endfErrorFiles = files.filter(f => 
-      f.type === 'endf' && 
+    const errorFiles = files.filter(f => 
+      f.type === 'mcnp-input' && 
       f.status === 'error' && 
       f.error &&
       !processedErrorsRef.current.has(f.id)
     );
     
-    if (endfErrorFiles.length > 0) {
-      const errorFile = endfErrorFiles[0];
+    if (errorFiles.length > 0) {
+      const errorFile = errorFiles[0];
       processedErrorsRef.current.add(errorFile.id);
       setFailedFile(errorFile);
       setErrorDialogOpen(true);
@@ -331,8 +255,8 @@ const UploadPrompt: React.FC = () => {
           content: await file.text(),
         }))
       );
-      // Directly use 'endf' type since we're on the ENDF page
-      await addFiles(filesData, 'endf');
+      // Directly use 'mcnp-input' type since we're on the MCNP Input page
+      await addFiles(filesData, 'mcnp-input');
     } catch (error) {
       console.error('Error uploading files:', error);
     } finally {
@@ -363,8 +287,8 @@ const UploadPrompt: React.FC = () => {
         })
       );
 
-      // Directly use 'endf' type since we're on the ENDF page
-      await addFiles(filesData, 'endf');
+      // Directly use 'mcnp-input' type since we're on the MCNP Input page
+      await addFiles(filesData, 'mcnp-input');
     } catch (error) {
       console.error('Error selecting files:', error);
     } finally {
@@ -411,9 +335,9 @@ const UploadPrompt: React.FC = () => {
       sx={{
         p: 4,
         textAlign: 'center',
-        bgcolor: dragActive ? alpha(theme.palette.secondary.main, 0.05) : 'transparent',
+        bgcolor: dragActive ? alpha(theme.palette.info.main, 0.05) : 'transparent',
         border: '2px dashed',
-        borderColor: dragActive ? 'secondary.main' : alpha(theme.palette.divider, 0.5),
+        borderColor: dragActive ? 'info.main' : alpha(theme.palette.divider, 0.5),
         borderRadius: 3,
         transition: 'all 0.2s ease',
       }}
@@ -433,7 +357,7 @@ const UploadPrompt: React.FC = () => {
       <Folder sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
       
       <Typography variant="h6" fontWeight={600} gutterBottom>
-        Upload ENDF Files
+        Upload MCNP Input Files
       </Typography>
       
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -442,7 +366,7 @@ const UploadPrompt: React.FC = () => {
 
       <Button
         variant="contained"
-        color="secondary"
+        color="info"
         startIcon={uploading ? <CircularProgress size={18} color="inherit" /> : <UploadFile />}
         onClick={openFileDialog}
         disabled={uploading}
@@ -450,7 +374,7 @@ const UploadPrompt: React.FC = () => {
         {uploading ? 'Uploading...' : 'Select Files'}
       </Button>
 
-      {/* Error fallback dialog - shown when ENDF parsing fails */}
+      {/* Error fallback dialog - shown when parsing fails */}
       <FileTypeSelectionDialog
         open={errorDialogOpen}
         onClose={handleErrorDialogClose}
@@ -458,41 +382,20 @@ const UploadPrompt: React.FC = () => {
         fileCount={1}
         fileNames={failedFile ? [failedFile.name] : []}
         errorMode={failedFile ? {
-          failedType: 'endf',
-          errorMessage: failedFile.error || 'Failed to parse file as ENDF format.',
+          failedType: 'mcnp-input',
+          errorMessage: failedFile.error || 'Failed to parse file as MCNP input format.',
         } : undefined}
       />
     </Paper>
   );
 };
 
-export const ENDFFiles: React.FC = () => {
+export const MCNPInputFiles: React.FC = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { getFilesByType, removeFile } = useFileWorkspace();
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [fileToDelete, setFileToDelete] = useState<WorkspaceFile | null>(null);
+  const { getFilesByType } = useFileWorkspace();
 
-  const endfFiles = useMemo(() => getFilesByType('endf'), [getFilesByType]);
-
-  // Handle file deletion
-  const handleDeleteRequest = useCallback((file: WorkspaceFile) => {
-    setFileToDelete(file);
-    setDeleteDialogOpen(true);
-  }, []);
-
-  const handleDeleteConfirm = useCallback(() => {
-    if (fileToDelete) {
-      removeFile(fileToDelete.id);
-    }
-    setDeleteDialogOpen(false);
-    setFileToDelete(null);
-  }, [fileToDelete, removeFile]);
-
-  const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setFileToDelete(null);
-  }, []);
+  const mcnpInputFiles = useMemo(() => getFilesByType('mcnp-input'), [getFilesByType]);
 
   return (
     <Box sx={{ width: '100%', minHeight: '100%' }}>
@@ -504,10 +407,10 @@ export const ENDFFiles: React.FC = () => {
             p: 4,
             mb: 4,
             borderRadius: 4,
-            background: `linear-gradient(135deg, ${alpha(theme.palette.secondary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.12)} 100%)`,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.05)} 0%, ${alpha(theme.palette.info.main, 0.12)} 100%)`,
             position: 'relative',
             overflow: 'hidden',
-            border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
+            border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -516,7 +419,7 @@ export const ENDFFiles: React.FC = () => {
               width: 200,
               height: 200,
               borderRadius: '50%',
-              background: alpha(theme.palette.secondary.main, 0.15),
+              background: alpha(theme.palette.info.main, 0.15),
               filter: 'blur(50px)',
             },
             '&::after': {
@@ -527,7 +430,7 @@ export const ENDFFiles: React.FC = () => {
               width: 150,
               height: 150,
               borderRadius: '50%',
-              background: alpha(theme.palette.primary.main, 0.1),
+              background: alpha(theme.palette.warning.main, 0.1),
               filter: 'blur(40px)',
             },
           }}
@@ -542,47 +445,47 @@ export const ENDFFiles: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  bgcolor: alpha(theme.palette.secondary.main, 0.15),
-                  color: theme.palette.secondary.main,
+                  bgcolor: alpha(theme.palette.info.main, 0.15),
+                  color: theme.palette.info.main,
                 }}
               >
-                <Timeline sx={{ fontSize: 32 }} />
+                <Code sx={{ fontSize: 32 }} />
               </Box>
               <Box>
                 <Typography variant="h4" fontWeight={700}>
-                  ENDF Files
+                  MCNP Input Files
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
-                  Explore and visualize ENDF-6 format evaluated nuclear data
+                  View and analyze MCNP input decks
                 </Typography>
               </Box>
             </Box>
 
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 3 }}>
               <Chip
-                icon={<Info sx={{ fontSize: 16 }} />}
-                label="Angular Distributions"
+                icon={<Description sx={{ fontSize: 16 }} />}
+                label="Material Definitions"
                 variant="outlined"
-                sx={{ borderColor: alpha(theme.palette.secondary.main, 0.3) }}
+                sx={{ borderColor: alpha(theme.palette.info.main, 0.3) }}
               />
               <Chip
-                icon={<ErrorOutline sx={{ fontSize: 16 }} />}
-                label="Uncertainty Visualization"
+                icon={<Calculate sx={{ fontSize: 16 }} />}
+                label="PERT Cards"
                 variant="outlined"
-                sx={{ borderColor: alpha(theme.palette.secondary.main, 0.3) }}
+                sx={{ borderColor: alpha(theme.palette.info.main, 0.3) }}
               />
               <Chip
-                icon={<Download sx={{ fontSize: 16 }} />}
-                label="Export Ready"
+                icon={<Analytics sx={{ fontSize: 16 }} />}
+                label="Tally Definitions"
                 variant="outlined"
-                sx={{ borderColor: alpha(theme.palette.secondary.main, 0.3) }}
+                sx={{ borderColor: alpha(theme.palette.info.main, 0.3) }}
               />
             </Box>
           </Box>
         </Paper>
       </Fade>
 
-      {/* About ENDF Section */}
+      {/* About Section */}
       <Fade in timeout={600}>
         <Box sx={{ mb: 4 }}>
           <Typography
@@ -590,7 +493,7 @@ export const ENDFFiles: React.FC = () => {
             color="text.secondary"
             sx={{ mb: 2, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}
           >
-            About ENDF Format
+            About MCNP Input Files
           </Typography>
           <Paper
             elevation={0}
@@ -603,36 +506,25 @@ export const ENDFFiles: React.FC = () => {
             <Grid container spacing={4}>
               <Grid item xs={12} md={6}>
                 <Typography variant="body1" paragraph>
-                  <strong>ENDF (Evaluated Nuclear Data File)</strong> is the standard format for storing 
-                  evaluated nuclear reaction data used in reactor physics and radiation transport calculations.
+                  <strong>MCNP Input Files</strong> define the complete geometry, materials, 
+                  sources, and tallies for Monte Carlo neutron transport simulations.
                 </Typography>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  ENDF files are organized into MF (file) and MT (reaction) sections. This viewer focuses on 
-                  MF4 (angular distributions) and MF34 (angular covariances) for uncertainty quantification.
+                  KIKA can parse and display material compositions, PERT cards for sensitivity 
+                  analysis, and other key elements of your MCNP input decks.
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Chip label="ENDF/B-VIII.0" size="small" />
-                  <Chip label="JEFF-3.3" size="small" />
-                  <Chip label="JENDL-5" size="small" />
-                  <Chip label="TENDL-2021" size="small" />
-                </Box>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <Feature
-                    icon={<ShowChart sx={{ fontSize: 20 }} />}
-                    title="Legendre Coefficients"
-                    description="View angular distribution data as Legendre polynomial coefficients"
+                    icon={<Description sx={{ fontSize: 20 }} />}
+                    title="Material Viewer"
+                    description="View nuclide compositions and densities for each material"
                   />
                   <Feature
-                    icon={<ErrorOutline sx={{ fontSize: 20 }} />}
-                    title="Uncertainty Bands"
-                    description="Visualize MF34 covariance data as uncertainty bands"
-                  />
-                  <Feature
-                    icon={<Compare sx={{ fontSize: 20 }} />}
-                    title="Library Comparison"
-                    description="Compare data from different evaluated nuclear data libraries"
+                    icon={<Calculate sx={{ fontSize: 20 }} />}
+                    title="PERT Card Analysis"
+                    description="Examine perturbation cards for sensitivity calculations"
                   />
                 </Box>
               </Grid>
@@ -650,31 +542,19 @@ export const ENDFFiles: React.FC = () => {
               color="text.secondary"
               sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}
             >
-              Your ENDF Files ({endfFiles.length})
+              Your MCNP Input Files ({mcnpInputFiles.length})
             </Typography>
-            {endfFiles.length > 0 && (
-              <Button
-                variant="outlined"
-                color="secondary"
-                size="small"
-                startIcon={<ShowChart />}
-                onClick={() => navigate('/endf-files/plotter')}
-              >
-                Open Plotter
-              </Button>
-            )}
           </Box>
 
-          {endfFiles.length === 0 ? (
+          {mcnpInputFiles.length === 0 ? (
             <UploadPrompt />
           ) : (
             <Grid container spacing={2}>
-              {endfFiles.map((file, index) => (
+              {mcnpInputFiles.map((file, index) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={file.id}>
-                  <ENDFFileCard
+                  <MCNPInputFileCard
                     file={file}
-                    onClick={() => navigate(`/endf-files/${file.id}`)}
-                    onDelete={handleDeleteRequest}
+                    onClick={() => navigate(`/mcnp-input/${file.id}`)}
                     delay={index * 50}
                   />
                 </Grid>
@@ -682,7 +562,7 @@ export const ENDFFiles: React.FC = () => {
               
               {/* Upload more card */}
               <Grid item xs={12} sm={6} md={4} lg={3}>
-                <Grow in timeout={400 + endfFiles.length * 50}>
+                <Grow in timeout={400 + mcnpInputFiles.length * 50}>
                   <Card
                     sx={{
                       height: '100%',
@@ -696,8 +576,8 @@ export const ENDFFiles: React.FC = () => {
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       '&:hover': {
-                        borderColor: theme.palette.secondary.main,
-                        bgcolor: alpha(theme.palette.secondary.main, 0.02),
+                        borderColor: theme.palette.info.main,
+                        bgcolor: alpha(theme.palette.info.main, 0.02),
                       },
                     }}
                     onClick={() => navigate('/files')}
@@ -716,137 +596,34 @@ export const ENDFFiles: React.FC = () => {
         </Box>
       </Fade>
 
-      {/* Quick Start Guide */}
+      {/* Sensitivity Analysis Coming Soon */}
       <Fade in timeout={800}>
         <Paper
           elevation={0}
           sx={{
             p: 3,
             borderRadius: 3,
-            bgcolor: alpha(theme.palette.info.main, 0.05),
-            border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+            bgcolor: alpha(theme.palette.warning.main, 0.05),
+            border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
           }}
         >
-          <Typography variant="h6" fontWeight={600} gutterBottom>
-            Getting Started
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Lock sx={{ color: theme.palette.warning.main }} />
+            <Typography variant="h6" fontWeight={600}>
+              Sensitivity Analysis
+            </Typography>
+            <Chip label="Coming Soon" size="small" color="warning" />
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            Prepare MCNP input files for sensitivity analysis by generating PERT cards 
+            with specific nuclides, reactions, and energy groups. Combine with MCTAL 
+            results to compute and visualize sensitivity coefficients.
           </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                <Box
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.secondary.main,
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '0.875rem',
-                    flexShrink: 0,
-                  }}
-                >
-                  1
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" fontWeight={600}>
-                    Upload Files
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Drag and drop ENDF files or use the file manager
-                  </Typography>
-                </Box>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                <Box
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.secondary.main,
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '0.875rem',
-                    flexShrink: 0,
-                  }}
-                >
-                  2
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" fontWeight={600}>
-                    Select a File
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Click on a file card to explore MF sections
-                  </Typography>
-                </Box>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                <Box
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.secondary.main,
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '0.875rem',
-                    flexShrink: 0,
-                  }}
-                >
-                  3
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" fontWeight={600}>
-                    Visualize Data
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Plot angular distributions with uncertainty bands
-                  </Typography>
-                </Box>
-              </Box>
-            </Grid>
-          </Grid>
         </Paper>
       </Fade>
 
       {/* Spacer */}
       <Box sx={{ height: 24 }} />
-
-      {/* Delete confirmation dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={handleDeleteCancel}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Delete File</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete "{fileToDelete?.displayName}"? This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDeleteCancel} color="inherit">
-            Cancel
-          </Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

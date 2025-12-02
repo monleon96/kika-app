@@ -422,3 +422,129 @@ export async function getENDFMatplotlibPreview(
   
   return exportENDFWithMatplotlib(previewRequest);
 }
+
+// ============================================================================
+// MCNP Input File Types and Functions
+// ============================================================================
+
+/**
+ * Material summary information
+ */
+export interface MaterialSummary {
+  id: number;
+  nuclide_count: number;
+  density?: number;
+}
+
+/**
+ * Nuclide in a material (detailed)
+ */
+export interface MaterialNuclideDetail {
+  zaid: string;
+  fraction: number;
+  nlib?: string;
+  plib?: string;
+}
+
+/**
+ * Detailed material info for import
+ */
+export interface MaterialDetailInfo {
+  id: number;
+  name: string;
+  nuclide_count: number;
+  density?: number;
+  fraction_type: 'atomic' | 'weight';
+  nuclides: MaterialNuclideDetail[];
+}
+
+/**
+ * MCNP Input file metadata from parsing
+ */
+export interface MCNPInputInfo {
+  file_id: string;
+  material_count: number;
+  material_ids: number[];
+  pert_count: number;
+  pert_ids: number[];
+  materials_summary: Record<number, MaterialSummary>;
+  materials_detail?: Record<number, MaterialDetailInfo>;
+}
+
+/**
+ * Parse MCNP input file and get metadata
+ */
+export async function parseMCNPInputFile(fileContent: string, fileName: string): Promise<MCNPInputInfo> {
+  const response = await fetch(`${KIKA_SERVER_URL}/api/mcnp/input/parse`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      file_content: fileContent,
+      file_name: fileName,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to parse MCNP input file');
+  }
+
+  return response.json();
+}
+
+// ============================================================================
+// MCTAL File Types and Functions
+// ============================================================================
+
+/**
+ * Tally summary information
+ */
+export interface TallySummary {
+  id: number;
+  name?: string;
+  n_cells_surfaces: number;
+  n_energy_bins: number;
+  has_perturbations: boolean;
+  result?: number;
+  error?: number;
+}
+
+/**
+ * MCTAL file metadata from parsing
+ */
+export interface MCTALInfo {
+  file_id: string;
+  code_name: string;
+  version: string;
+  problem_id: string;
+  nps: number;
+  tally_count: number;
+  tally_numbers: number[];
+  npert: number;
+  tallies_summary: Record<number, TallySummary>;
+}
+
+/**
+ * Parse MCTAL file and get metadata
+ */
+export async function parseMCTALFile(fileContent: string, fileName: string): Promise<MCTALInfo> {
+  const response = await fetch(`${KIKA_SERVER_URL}/api/mcnp/mctal/parse`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      file_content: fileContent,
+      file_name: fileName,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to parse MCTAL file');
+  }
+
+  return response.json();
+}

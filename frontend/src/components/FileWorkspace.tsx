@@ -30,11 +30,29 @@ import {
   HourglassEmpty,
   OpenInNew,
   Edit,
+  Code,
+  Assessment,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
-import type { WorkspaceFile } from '../types/file';
-import { formatFileSize } from '../utils/fileDetection';
+import type { WorkspaceFile, FileType } from '../types/file';
+import { FileTypeSelectionDialog } from './FileTypeSelectionDialog';
+
+/**
+ * Format file size in human-readable format
+ */
+function formatFileSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = bytes;
+  let unitIndex = 0;
+  
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+  
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+}
 
 // Check if running in Tauri
 const isTauri = '__TAURI__' in window;
@@ -66,35 +84,49 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [typeSelectionOpen, setTypeSelectionOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<Array<{ name: string; path: string; content: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredFiles = getFilteredFiles();
   const aceCount = files.filter(f => f.type === 'ace' && f.status === 'ready').length;
   const endfCount = files.filter(f => f.type === 'endf' && f.status === 'ready').length;
+  const mcnpInputCount = files.filter(f => f.type === 'mcnp-input' && f.status === 'ready').length;
+  const mctalCount = files.filter(f => f.type === 'mcnp-mctal' && f.status === 'ready').length;
 
-  // Handle file upload
-  const handleFiles = useCallback(async (fileList: FileList) => {
-    setUploading(true);
-    try {
-      const filesArray = Array.from(fileList);
-      const filesData = await Promise.all(
-        filesArray.map(async file => ({
-          name: file.name,
-          path: file.name,
-          content: await file.text(),
-        }))
-      );
-      await addFiles(filesData);
-    } catch (error) {
-      console.error('Error uploading files:', error);
-    } finally {
-      setUploading(false);
+  // Handle file type selection from dialog
+  const handleTypeSelect = useCallback(async (type: FileType) => {
+    setTypeSelectionOpen(false);
+    if (pendingFiles.length > 0) {
+      setUploading(true);
+      try {
+        await addFiles(pendingFiles, type);
+      } catch (error) {
+        console.error('Error uploading files:', error);
+      } finally {
+        setUploading(false);
+        setPendingFiles([]);
+      }
     }
-  }, [addFiles]);
+  }, [pendingFiles, addFiles]);
+
+  // Handle files - now opens type selection dialog instead of auto-detecting
+  const handleFiles = useCallback(async (fileList: FileList) => {
+    const filesArray = Array.from(fileList);
+    const filesData = await Promise.all(
+      filesArray.map(async file => ({
+        name: file.name,
+        path: file.name,
+        content: await file.text(),
+      }))
+    );
+    // Store files and open type selection dialog
+    setPendingFiles(filesData);
+    setTypeSelectionOpen(true);
+  }, []);
 
   // Handle Tauri file dialog
   const handleTauriFileSelect = useCallback(async () => {
-    setUploading(true);
     try {
       const { open: openDialog } = await import('@tauri-apps/api/dialog');
       const { readTextFile } = await import('@tauri-apps/api/fs');
@@ -108,7 +140,6 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
       });
 
       if (!selected || !Array.isArray(selected) || selected.length === 0) {
-        setUploading(false);
         return;
       }
 
@@ -120,13 +151,13 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
         })
       );
 
-      await addFiles(filesData);
+      // Store files and open type selection dialog
+      setPendingFiles(filesData);
+      setTypeSelectionOpen(true);
     } catch (error) {
       console.error('Error selecting files:', error);
-    } finally {
-      setUploading(false);
     }
-  }, [addFiles]);
+  }, []);
 
   // Drag and drop handlers
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -168,6 +199,10 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
         navigate('/ace-files');
       } else if (file.type === 'endf') {
         navigate('/endf-files');
+      } else if (file.type === 'mcnp-input') {
+        navigate('/mcnp-input');
+      } else if (file.type === 'mcnp-mctal') {
+        navigate('/mcnp-mctal');
       }
       onClose();
     }
@@ -189,6 +224,8 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
   const getFileColor = (file: WorkspaceFile) => {
     if (file.type === 'ace') return theme.palette.primary.main;
     if (file.type === 'endf') return theme.palette.secondary.main;
+    if (file.type === 'mcnp-input') return theme.palette.info.main;
+    if (file.type === 'mcnp-mctal') return theme.palette.warning.main;
     return theme.palette.grey[500];
   };
 
@@ -251,7 +288,7 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
           onDragOver={handleDrag}
           onDrop={handleDrop}
         >
-          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
             <Chip
               icon={<Science sx={{ fontSize: 16 }} />}
               label={aceCount}
@@ -259,7 +296,7 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
               color="primary"
               variant={filter.type === 'ace' ? 'filled' : 'outlined'}
               onClick={() => setFilter({ type: filter.type === 'ace' ? 'all' : 'ace' })}
-              sx={{ flex: 1 }}
+              sx={{ flex: '1 1 45%', minWidth: 60 }}
             />
             <Chip
               icon={<InsertDriveFile sx={{ fontSize: 16 }} />}
@@ -268,7 +305,27 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
               color="secondary"
               variant={filter.type === 'endf' ? 'filled' : 'outlined'}
               onClick={() => setFilter({ type: filter.type === 'endf' ? 'all' : 'endf' })}
-              sx={{ flex: 1 }}
+              sx={{ flex: '1 1 45%', minWidth: 60 }}
+            />
+            <Chip
+              icon={<Code sx={{ fontSize: 16 }} />}
+              label={mcnpInputCount}
+              size="small"
+              color="info"
+              variant={filter.type === 'mcnp-input' ? 'filled' : 'outlined'}
+              onClick={() => setFilter({ type: filter.type === 'mcnp-input' ? 'all' : 'mcnp-input' })}
+              sx={{ flex: '1 1 45%', minWidth: 60 }}
+              title="MCNP Input Files"
+            />
+            <Chip
+              icon={<Assessment sx={{ fontSize: 16 }} />}
+              label={mctalCount}
+              size="small"
+              color="warning"
+              variant={filter.type === 'mcnp-mctal' ? 'filled' : 'outlined'}
+              onClick={() => setFilter({ type: filter.type === 'mcnp-mctal' ? 'all' : 'mcnp-mctal' })}
+              sx={{ flex: '1 1 45%', minWidth: 60 }}
+              title="MCTAL Files"
             />
           </Box>
 
@@ -341,8 +398,14 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
                   <ListItemIcon sx={{ minWidth: 32 }}>
                     {file.type === 'ace' ? (
                       <Science sx={{ fontSize: 20 }} color="primary" />
-                    ) : (
+                    ) : file.type === 'endf' ? (
                       <InsertDriveFile sx={{ fontSize: 20 }} color="secondary" />
+                    ) : file.type === 'mcnp-input' ? (
+                      <Code sx={{ fontSize: 20 }} color="info" />
+                    ) : file.type === 'mcnp-mctal' ? (
+                      <Assessment sx={{ fontSize: 20 }} color="warning" />
+                    ) : (
+                      <InsertDriveFile sx={{ fontSize: 20 }} />
                     )}
                   </ListItemIcon>
                   <ListItemText
@@ -418,6 +481,18 @@ export const FileWorkspace: React.FC<FileWorkspaceProps> = ({
           </>
         )}
       </Box>
+
+      {/* File Type Selection Dialog */}
+      <FileTypeSelectionDialog
+        open={typeSelectionOpen}
+        onClose={() => {
+          setTypeSelectionOpen(false);
+          setPendingFiles([]);
+        }}
+        onSelect={handleTypeSelect}
+        fileCount={pendingFiles.length}
+        fileNames={pendingFiles.map(f => f.name)}
+      />
     </Drawer>
   );
 };

@@ -72,12 +72,6 @@ const FileUploadPrompt: React.FC = () => {
 
       const selected = await openDialog({
         multiple: true,
-        filters: [
-          {
-            name: 'ENDF Files',
-            extensions: ['endf', 'endf6', 'txt', 'dat', 'tendl'],
-          },
-        ],
       });
 
       if (!selected || !Array.isArray(selected) || selected.length === 0) {
@@ -157,7 +151,6 @@ const FileUploadPrompt: React.FC = () => {
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".endf,.endf6,.txt,.dat"
         onChange={handleFileInputChange}
         style={{ display: 'none' }}
       />
@@ -204,9 +197,6 @@ const FileUploadPrompt: React.FC = () => {
         {uploading ? 'Uploading...' : 'Upload ENDF Files'}
       </Button>
 
-      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 4 }}>
-        Supported formats: .endf, .endf6, .txt, .dat • Drag and drop supported
-      </Typography>
     </Paper>
   );
 };
@@ -263,12 +253,6 @@ export const ENDFPlotter: React.FC = () => {
         
         const selected = await openDialog({
           multiple: false,
-          filters: [
-            {
-              name: 'ENDF Files',
-              extensions: ['endf', 'endf6', 'txt', 'dat', 'tendl'],
-            },
-          ],
         });
         
         if (selected && typeof selected === 'string') {
@@ -310,7 +294,6 @@ export const ENDFPlotter: React.FC = () => {
         type="file"
         ref={reuploadInputRef}
         style={{ display: 'none' }}
-        accept=".endf,.endf6,.txt,.dat,.tendl"
         onChange={handleReuploadChange}
       />
       {/* Breadcrumb Navigation */}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Typography,
@@ -14,6 +14,16 @@ import {
   Fade,
   Grow,
   Grid,
+  IconButton,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import {
   Science,
@@ -26,9 +36,13 @@ import {
   Compare,
   Download,
   Thermostat,
+  MoreVert,
+  Delete,
+  OpenInNew,
 } from '@mui/icons-material';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
-import type { WorkspaceFile, ACEMetadata } from '../types/file';
+import type { WorkspaceFile, ACEMetadata, FileType } from '../types/file';
+import { FileTypeSelectionDialog } from '../components/FileTypeSelectionDialog';
 
 // Check if running in Tauri
 const isTauri = '__TAURI__' in window;
@@ -37,17 +51,33 @@ const isTauri = '__TAURI__' in window;
 interface ACEFileCardProps {
   file: WorkspaceFile;
   onClick: () => void;
+  onDelete: (file: WorkspaceFile) => void;
   delay?: number;
 }
 
-const ACEFileCard: React.FC<ACEFileCardProps> = ({ file, onClick, delay = 0 }) => {
+const ACEFileCard: React.FC<ACEFileCardProps> = ({ file, onClick, onDelete, delay = 0 }) => {
   const theme = useTheme();
   const [hovered, setHovered] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   
   // Type guard for ACE metadata
   const metadata = file.metadata && 'atomic_weight_ratio' in file.metadata 
     ? file.metadata as ACEMetadata 
     : null;
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+    setMenuAnchor(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+  };
+
+  const handleDelete = () => {
+    handleMenuClose();
+    onDelete(file);
+  };
 
   return (
     <Grow in timeout={400 + delay}>
@@ -77,6 +107,34 @@ const ACEFileCard: React.FC<ACEFileCardProps> = ({ file, onClick, delay = 0 }) =
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
+        {/* Menu button moved outside CardActionArea to avoid DOM nesting issue */}
+        <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}>
+          <IconButton
+            size="small"
+            onClick={handleMenuOpen}
+            sx={{ 
+              opacity: hovered ? 1 : 0,
+              transition: 'opacity 0.2s ease',
+            }}
+          >
+            <MoreVert fontSize="small" />
+          </IconButton>
+          <Menu
+            anchorEl={menuAnchor}
+            open={Boolean(menuAnchor)}
+            onClose={handleMenuClose}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MenuItem onClick={() => { handleMenuClose(); onClick(); }}>
+              <ListItemIcon><OpenInNew fontSize="small" /></ListItemIcon>
+              <ListItemText>Open</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
+              <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
+              <ListItemText>Delete</ListItemText>
+            </MenuItem>
+          </Menu>
+        </Box>
         <CardActionArea
           onClick={onClick}
           sx={{
@@ -104,7 +162,7 @@ const ACEFileCard: React.FC<ACEFileCardProps> = ({ file, onClick, delay = 0 }) =
             >
               <Science sx={{ fontSize: 24 }} />
             </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Box sx={{ flex: 1, minWidth: 0, pr: 4 }}>
               <Typography variant="subtitle1" fontWeight={600} noWrap>
                 {file.displayName}
               </Typography>
@@ -200,13 +258,51 @@ const Feature: React.FC<FeatureProps> = ({ icon, title, description }) => {
   );
 };
 
-// Upload prompt component
+// Upload prompt component with fallback for parse errors
 const UploadPrompt: React.FC = () => {
   const theme = useTheme();
-  const { addFiles } = useFileWorkspace();
+  const { addFiles, files, updateFileType, removeFile } = useFileWorkspace();
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [failedFile, setFailedFile] = useState<WorkspaceFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const processedErrorsRef = useRef<Set<string>>(new Set());
+
+  // Monitor for ACE parse errors to show fallback dialog
+  useEffect(() => {
+    const aceErrorFiles = files.filter(f => 
+      f.type === 'ace' && 
+      f.status === 'error' && 
+      f.error &&
+      !processedErrorsRef.current.has(f.id)
+    );
+    
+    if (aceErrorFiles.length > 0) {
+      const errorFile = aceErrorFiles[0];
+      processedErrorsRef.current.add(errorFile.id);
+      setFailedFile(errorFile);
+      setErrorDialogOpen(true);
+    }
+  }, [files]);
+
+  // Handle error dialog type selection (try as different type)
+  const handleErrorTypeSelect = useCallback(async (type: FileType) => {
+    if (failedFile) {
+      await updateFileType(failedFile.id, type);
+    }
+    setErrorDialogOpen(false);
+    setFailedFile(null);
+  }, [failedFile, updateFileType]);
+
+  // Handle error dialog close (remove the failed file)
+  const handleErrorDialogClose = useCallback(() => {
+    if (failedFile) {
+      removeFile(failedFile.id);
+    }
+    setErrorDialogOpen(false);
+    setFailedFile(null);
+  }, [failedFile, removeFile]);
 
   const handleFiles = useCallback(async (fileList: FileList) => {
     setUploading(true);
@@ -219,7 +315,8 @@ const UploadPrompt: React.FC = () => {
           content: await file.text(),
         }))
       );
-      await addFiles(filesData);
+      // Directly use 'ace' type since we're on the ACE page
+      await addFiles(filesData, 'ace');
     } catch (error) {
       console.error('Error uploading files:', error);
     } finally {
@@ -235,7 +332,6 @@ const UploadPrompt: React.FC = () => {
 
       const selected = await openDialog({
         multiple: true,
-        filters: [{ name: 'ACE Files', extensions: ['ace', '02c', '03c', '20c', '21c', '70c', '80c'] }],
       });
 
       if (!selected || !Array.isArray(selected) || selected.length === 0) {
@@ -251,7 +347,8 @@ const UploadPrompt: React.FC = () => {
         })
       );
 
-      await addFiles(filesData);
+      // Directly use 'ace' type since we're on the ACE page
+      await addFiles(filesData, 'ace');
     } catch (error) {
       console.error('Error selecting files:', error);
     } finally {
@@ -313,7 +410,6 @@ const UploadPrompt: React.FC = () => {
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".ace,.02c,.03c,.20c,.21c,.70c,.80c"
         onChange={handleFileInputChange}
         style={{ display: 'none' }}
       />
@@ -337,9 +433,18 @@ const UploadPrompt: React.FC = () => {
         {uploading ? 'Uploading...' : 'Select Files'}
       </Button>
 
-      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 2 }}>
-        Supported: .ace, .02c, .03c, .20c, .21c, .70c, .80c
-      </Typography>
+      {/* Error fallback dialog - shown when ACE parsing fails */}
+      <FileTypeSelectionDialog
+        open={errorDialogOpen}
+        onClose={handleErrorDialogClose}
+        onSelect={handleErrorTypeSelect}
+        fileCount={1}
+        fileNames={failedFile ? [failedFile.name] : []}
+        errorMode={failedFile ? {
+          failedType: 'ace',
+          errorMessage: failedFile.error || 'Failed to parse file as ACE format.',
+        } : undefined}
+      />
     </Paper>
   );
 };
@@ -347,9 +452,30 @@ const UploadPrompt: React.FC = () => {
 export const ACEFiles: React.FC = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { getFilesByType } = useFileWorkspace();
+  const { getFilesByType, removeFile } = useFileWorkspace();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<WorkspaceFile | null>(null);
 
   const aceFiles = useMemo(() => getFilesByType('ace'), [getFilesByType]);
+
+  // Handle file deletion
+  const handleDeleteRequest = useCallback((file: WorkspaceFile) => {
+    setFileToDelete(file);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (fileToDelete) {
+      removeFile(fileToDelete.id);
+    }
+    setDeleteDialogOpen(false);
+    setFileToDelete(null);
+  }, [fileToDelete, removeFile]);
+
+  const handleDeleteCancel = useCallback(() => {
+    setDeleteDialogOpen(false);
+    setFileToDelete(null);
+  }, []);
 
   return (
     <Box sx={{ width: '100%', minHeight: '100%' }}>
@@ -530,6 +656,7 @@ export const ACEFiles: React.FC = () => {
                   <ACEFileCard
                     file={file}
                     onClick={() => navigate(`/ace-files/${file.id}`)}
+                    onDelete={handleDeleteRequest}
                     delay={index * 50}
                   />
                 </Grid>
@@ -679,6 +806,29 @@ export const ACEFiles: React.FC = () => {
 
       {/* Spacer */}
       <Box sx={{ height: 24 }} />
+
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete File</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete "{fileToDelete?.displayName}"? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

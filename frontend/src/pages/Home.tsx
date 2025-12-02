@@ -22,6 +22,7 @@ import {
   Storage,
   DesktopWindows,
   Inventory,
+  Analytics,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
@@ -207,6 +208,7 @@ export const Home: React.FC = () => {
 
   const aceFiles = files.filter(f => f.type === 'ace' && f.status === 'ready').length;
   const endfFiles = files.filter(f => f.type === 'endf' && f.status === 'ready').length;
+  const mcnpFiles = files.filter(f => (f.type === 'mcnp-input' || f.type === 'mcnp-mctal') && f.status === 'ready').length;
 
   const features = [
     {
@@ -222,6 +224,13 @@ export const Home: React.FC = () => {
       icon: <Timeline sx={{ fontSize: 28 }} />,
       onClick: () => navigate('/endf-files'),
       color: theme.palette.secondary.main,
+    },
+    {
+      title: 'MCNP',
+      description: 'Parse MCNP input decks and analyze MCTAL tally outputs with material compositions, PERT cards, and sensitivity analysis.',
+      icon: <Analytics sx={{ fontSize: 28 }} />,
+      onClick: () => navigate('/mcnp'),
+      color: theme.palette.info.main,
     },
     {
       title: 'Materials',

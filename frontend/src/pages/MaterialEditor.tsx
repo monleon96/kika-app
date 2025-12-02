@@ -472,7 +472,6 @@ export const MaterialEditor: React.FC = () => {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".i,.inp,.txt,.mcnp"
                     style={{ display: 'none' }}
                     onChange={handleFileUpload}
                   />

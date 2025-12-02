@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Box, AppBar, Toolbar, Typography, IconButton, Button, Badge, Tooltip } from '@mui/material';
-import { Logout, Home as HomeIcon, Folder, FolderOpen, Info, Settings, FolderCopy, Science } from '@mui/icons-material';
+import { Logout, Home as HomeIcon, Folder, FolderOpen, Info, Settings, FolderCopy, Science, Analytics } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
 import { FileWorkspace } from './FileWorkspace';
@@ -92,6 +92,17 @@ export const Layout: React.FC = () => {
               }}
             >
               ENDF Files
+            </Button>
+            <Button
+              color="inherit"
+              startIcon={<Analytics />}
+              onClick={() => navigate('/mcnp')}
+              sx={{
+                bgcolor: (location.pathname.startsWith('/mcnp-input') || location.pathname.startsWith('/mcnp-mctal') || location.pathname === '/mcnp') ? 'rgba(255,255,255,0.15)' : 'transparent',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+              }}
+            >
+              MCNP
             </Button>
             <Button
               color="inherit"

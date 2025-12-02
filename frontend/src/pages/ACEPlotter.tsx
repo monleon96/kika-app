@@ -61,12 +61,6 @@ const FileUploadPrompt: React.FC = () => {
 
       const selected = await openDialog({
         multiple: true,
-        filters: [
-          {
-            name: 'ACE Files',
-            extensions: ['ace', '02c', '03c', '20c', '21c', '70c', '80c'],
-          },
-        ],
       });
 
       if (!selected || !Array.isArray(selected) || selected.length === 0) {
@@ -144,7 +138,6 @@ const FileUploadPrompt: React.FC = () => {
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".ace,.02c,.03c,.20c,.21c,.70c,.80c"
         onChange={handleFileInputChange}
         style={{ display: 'none' }}
       />
@@ -170,9 +163,6 @@ const FileUploadPrompt: React.FC = () => {
         {uploading ? 'Uploading...' : 'Upload ACE Files'}
       </Button>
 
-      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 3 }}>
-        Supported formats: .ace, .02c, .03c, .20c, .21c, .70c, .80c
-      </Typography>
     </Paper>
   );
 };

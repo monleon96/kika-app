@@ -48,12 +48,30 @@ import {
   Visibility,
   FolderOpen,
   CloudUpload,
+  Code,
+  Assessment,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
 import { useAuth } from '../contexts/AuthContext';
-import type { WorkspaceFile } from '../types/file';
-import { formatFileSize } from '../utils/fileDetection';
+import type { WorkspaceFile, FileType } from '../types/file';
+import { FileTypeSelectionDialog } from '../components/FileTypeSelectionDialog';
+
+/**
+ * Format file size in human-readable format
+ */
+function formatFileSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = bytes;
+  let unitIndex = 0;
+  
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+  
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+}
 
 // Check if running in Tauri
 const isTauri = '__TAURI__' in window;
@@ -145,12 +163,23 @@ const FileCard: React.FC<FileCardProps> = ({ file, onDelete, onRename, onView, v
     if (file.type === 'ace') {
       return <Science sx={{ fontSize: viewMode === 'grid' ? 40 : 24 }} />;
     }
+    if (file.type === 'endf') {
+      return <InsertDriveFile sx={{ fontSize: viewMode === 'grid' ? 40 : 24 }} />;
+    }
+    if (file.type === 'mcnp-input') {
+      return <Code sx={{ fontSize: viewMode === 'grid' ? 40 : 24 }} />;
+    }
+    if (file.type === 'mcnp-mctal') {
+      return <Assessment sx={{ fontSize: viewMode === 'grid' ? 40 : 24 }} />;
+    }
     return <InsertDriveFile sx={{ fontSize: viewMode === 'grid' ? 40 : 24 }} />;
   };
 
   const getFileColor = () => {
     if (file.type === 'ace') return theme.palette.primary.main;
     if (file.type === 'endf') return theme.palette.secondary.main;
+    if (file.type === 'mcnp-input') return theme.palette.info.main;
+    if (file.type === 'mcnp-mctal') return theme.palette.warning.main;
     return theme.palette.grey[500];
   };
 
@@ -401,35 +430,49 @@ export const FileManager: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [typeSelectionOpen, setTypeSelectionOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<Array<{ name: string; path: string; content: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredFiles = getFilteredFiles();
   const aceCount = files.filter(f => f.type === 'ace').length;
   const endfCount = files.filter(f => f.type === 'endf').length;
+  const mcnpInputCount = files.filter(f => f.type === 'mcnp-input').length;
+  const mctalCount = files.filter(f => f.type === 'mcnp-mctal').length;
 
-  // Handle file upload
-  const handleFiles = useCallback(async (fileList: FileList) => {
-    setUploading(true);
-    try {
-      const filesArray = Array.from(fileList);
-      const filesData = await Promise.all(
-        filesArray.map(async file => ({
-          name: file.name,
-          path: file.name,
-          content: await file.text(),
-        }))
-      );
-      await addFiles(filesData);
-    } catch (error) {
-      console.error('Error uploading files:', error);
-    } finally {
-      setUploading(false);
+  // Handle file type selection from dialog
+  const handleTypeSelect = useCallback(async (type: FileType) => {
+    setTypeSelectionOpen(false);
+    if (pendingFiles.length > 0) {
+      setUploading(true);
+      try {
+        await addFiles(pendingFiles, type);
+      } catch (error) {
+        console.error('Error uploading files:', error);
+      } finally {
+        setUploading(false);
+        setPendingFiles([]);
+      }
     }
-  }, [addFiles]);
+  }, [pendingFiles, addFiles]);
+
+  // Handle files - now opens type selection dialog instead of auto-detecting
+  const handleFiles = useCallback(async (fileList: FileList) => {
+    const filesArray = Array.from(fileList);
+    const filesData = await Promise.all(
+      filesArray.map(async file => ({
+        name: file.name,
+        path: file.name,
+        content: await file.text(),
+      }))
+    );
+    // Store files and open type selection dialog
+    setPendingFiles(filesData);
+    setTypeSelectionOpen(true);
+  }, []);
 
   // Handle Tauri file dialog
   const handleTauriFileSelect = useCallback(async () => {
-    setUploading(true);
     try {
       const { open: openDialog } = await import('@tauri-apps/api/dialog');
       const { readTextFile } = await import('@tauri-apps/api/fs');
@@ -443,7 +486,6 @@ export const FileManager: React.FC = () => {
       });
 
       if (!selected || !Array.isArray(selected) || selected.length === 0) {
-        setUploading(false);
         return;
       }
 
@@ -455,13 +497,13 @@ export const FileManager: React.FC = () => {
         })
       );
 
-      await addFiles(filesData);
+      // Store files and open type selection dialog
+      setPendingFiles(filesData);
+      setTypeSelectionOpen(true);
     } catch (error) {
       console.error('Error selecting files:', error);
-    } finally {
-      setUploading(false);
     }
-  }, [addFiles]);
+  }, []);
 
   // Drag and drop handlers
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -502,6 +544,10 @@ export const FileManager: React.FC = () => {
       navigate(`/ace-files/${file.id}`);
     } else if (file.type === 'endf') {
       navigate(`/endf-files/${file.id}`);
+    } else if (file.type === 'mcnp-input') {
+      navigate(`/mcnp-input/${file.id}`);
+    } else if (file.type === 'mcnp-mctal') {
+      navigate(`/mcnp-mctal/${file.id}`);
     }
   };
 
@@ -552,56 +598,125 @@ export const FileManager: React.FC = () => {
         </Box>
       )}
 
-      {/* Header */}
-      <Fade in timeout={400}>
-        <Box sx={{ mb: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Box>
-              <Typography variant="h4" fontWeight={700}>
-                File Manager
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Manage your nuclear data files
-              </Typography>
+      {/* Hero Section */}
+      <Fade in timeout={500}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 4,
+            mb: 4,
+            borderRadius: 4,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.primary.main, 0.12)} 100%)`,
+            position: 'relative',
+            overflow: 'hidden',
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: -80,
+              right: -80,
+              width: 200,
+              height: 200,
+              borderRadius: '50%',
+              background: alpha(theme.palette.primary.main, 0.15),
+              filter: 'blur(50px)',
+            },
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: -60,
+              left: -60,
+              width: 150,
+              height: 150,
+              borderRadius: '50%',
+              background: alpha(theme.palette.secondary.main, 0.1),
+              filter: 'blur(40px)',
+            },
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 3,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: alpha(theme.palette.primary.main, 0.15),
+                    color: theme.palette.primary.main,
+                  }}
+                >
+                  <FolderOpen sx={{ fontSize: 32 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h4" fontWeight={700}>
+                    File Manager
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Manage your nuclear data files in one place
+                  </Typography>
+                </Box>
+              </Box>
+              <Button
+                variant="contained"
+                startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <UploadFile />}
+                onClick={openFileDialog}
+                disabled={uploading}
+                size="large"
+              >
+                Upload Files
+              </Button>
             </Box>
-            <Button
-              variant="contained"
-              startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <UploadFile />}
-              onClick={openFileDialog}
-              disabled={uploading}
-              size="large"
-            >
-              Upload Files
-            </Button>
-          </Box>
 
-          {/* Stats */}
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Chip
-              icon={<Science />}
-              label={`${aceCount} ACE files`}
-              variant={filter.type === 'ace' ? 'filled' : 'outlined'}
-              color="primary"
-              onClick={() => setFilter({ type: filter.type === 'ace' ? 'all' : 'ace' })}
-            />
-            <Chip
-              icon={<InsertDriveFile />}
-              label={`${endfCount} ENDF files`}
-              variant={filter.type === 'endf' ? 'filled' : 'outlined'}
-              color="secondary"
-              onClick={() => setFilter({ type: filter.type === 'endf' ? 'all' : 'endf' })}
-            />
-            {files.length > 0 && (
+            {/* Stats */}
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 3 }}>
               <Chip
-                icon={<DeleteSweep />}
-                label="Clear All"
-                variant="outlined"
-                color="error"
-                onClick={() => setClearDialogOpen(true)}
+                icon={<Science />}
+                label={`${aceCount} ACE files`}
+                variant={filter.type === 'ace' ? 'filled' : 'outlined'}
+                color="primary"
+                onClick={() => setFilter({ type: filter.type === 'ace' ? 'all' : 'ace' })}
+                sx={{ borderColor: alpha(theme.palette.primary.main, 0.3) }}
               />
-            )}
+              <Chip
+                icon={<InsertDriveFile />}
+                label={`${endfCount} ENDF files`}
+                variant={filter.type === 'endf' ? 'filled' : 'outlined'}
+                color="secondary"
+                onClick={() => setFilter({ type: filter.type === 'endf' ? 'all' : 'endf' })}
+                sx={{ borderColor: alpha(theme.palette.secondary.main, 0.3) }}
+              />
+              <Chip
+                icon={<Code />}
+                label={`${mcnpInputCount} MCNP Input`}
+                variant={filter.type === 'mcnp-input' ? 'filled' : 'outlined'}
+                color="info"
+                onClick={() => setFilter({ type: filter.type === 'mcnp-input' ? 'all' : 'mcnp-input' })}
+                sx={{ borderColor: alpha(theme.palette.info.main, 0.3) }}
+              />
+              <Chip
+                icon={<Assessment />}
+                label={`${mctalCount} MCTAL`}
+                variant={filter.type === 'mcnp-mctal' ? 'filled' : 'outlined'}
+                color="warning"
+                onClick={() => setFilter({ type: filter.type === 'mcnp-mctal' ? 'all' : 'mcnp-mctal' })}
+                sx={{ borderColor: alpha(theme.palette.warning.main, 0.3) }}
+              />
+              {files.length > 0 && (
+                <Chip
+                  icon={<DeleteSweep />}
+                  label="Clear All"
+                  variant="outlined"
+                  color="error"
+                  onClick={() => setClearDialogOpen(true)}
+                />
+              )}
+            </Box>
           </Box>
-        </Box>
+        </Paper>
       </Fade>
 
       {/* Toolbar */}
@@ -782,6 +897,18 @@ export const FileManager: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* File Type Selection Dialog */}
+      <FileTypeSelectionDialog
+        open={typeSelectionOpen}
+        onClose={() => {
+          setTypeSelectionOpen(false);
+          setPendingFiles([]);
+        }}
+        onSelect={handleTypeSelect}
+        fileCount={pendingFiles.length}
+        fileNames={pendingFiles.map(f => f.name)}
+      />
     </Box>
   );
 };

@@ -1,14 +1,21 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import type { WorkspaceFile, FileFilter, FileType } from '../types/file';
-import { detectFileType, generateFileId } from '../utils/fileDetection';
-import { parseACEFile, parseENDFFile } from '../services/kikaService';
+import { parseACEFile, parseENDFFile, parseMCNPInputFile, parseMCTALFile } from '../services/kikaService';
+
+/**
+ * Generate a unique file ID
+ */
+function generateFileId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
 
 interface FileWorkspaceContextType {
   files: WorkspaceFile[];
   filter: FileFilter;
   isLoading: boolean;
-  addFiles: (files: Array<{ name: string; path: string; content: string }>) => Promise<void>;
+  addFiles: (files: Array<{ name: string; path: string; content: string }>, forceType?: FileType) => Promise<void>;
   updateFileContent: (id: string, content: string) => Promise<void>;
+  updateFileType: (id: string, newType: FileType) => Promise<void>;
   removeFile: (id: string) => void;
   renameFile: (id: string, newDisplayName: string) => void;
   clearAll: () => void;
@@ -307,6 +314,32 @@ export const FileWorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           metadata,
           error: undefined,
         };
+      } else if (file.type === 'mcnp-input') {
+        setFiles(prev => prev.map(f =>
+          f.id === file.id ? { ...f, status: 'parsing' as const } : f
+        ));
+
+        const metadata = await parseMCNPInputFile(file.content, file.name);
+
+        return {
+          ...file,
+          status: 'ready',
+          metadata,
+          error: undefined,
+        };
+      } else if (file.type === 'mcnp-mctal') {
+        setFiles(prev => prev.map(f =>
+          f.id === file.id ? { ...f, status: 'parsing' as const } : f
+        ));
+
+        const metadata = await parseMCTALFile(file.content, file.name);
+
+        return {
+          ...file,
+          status: 'ready',
+          metadata,
+          error: undefined,
+        };
       }
       
       return {
@@ -322,21 +355,25 @@ export const FileWorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  const addFiles = useCallback(async (newFiles: Array<{ name: string; path: string; content: string }>) => {
+  const addFiles = useCallback(async (newFiles: Array<{ name: string; path: string; content: string }>, forceType?: FileType) => {
+    // forceType is required - files without a type cannot be added
+    // The UI should always prompt the user to select a type before calling this function
+    if (!forceType) {
+      console.error('addFiles called without forceType. File type selection is required.');
+      return;
+    }
+
     const workspaceFiles: WorkspaceFile[] = newFiles.map(file => {
-      const detectedType = detectFileType(file.name, file.content);
-      
       return {
         id: generateFileId(),
         name: file.name,
         displayName: file.name, // Default display name is the original filename
         path: file.path,
         content: file.content,
-        type: detectedType,
-        status: detectedType ? 'pending' : 'error',
+        type: forceType,
+        status: 'pending' as const,
         size: new Blob([file.content]).size,
         uploadedAt: new Date(),
-        error: detectedType ? undefined : 'Could not detect file type. Expected ACE or ENDF-6 format.',
       };
     });
 
@@ -371,6 +408,28 @@ export const FileWorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       const parsedFile = await parseFile(updatedFile);
       setFiles(prev => prev.map(f => f.id === id ? parsedFile : f));
     }
+  }, [files, parseFile]);
+
+  // Update file type and re-parse (used when initial parsing fails and user wants to try a different type)
+  const updateFileType = useCallback(async (id: string, newType: FileType) => {
+    // Find the existing file
+    const existingFile = files.find(f => f.id === id);
+    if (!existingFile) return;
+
+    // Update the file with new type and set to pending
+    const updatedFile: WorkspaceFile = {
+      ...existingFile,
+      type: newType,
+      status: 'pending',
+      error: undefined,
+      metadata: undefined,
+    };
+
+    setFiles(prev => prev.map(f => f.id === id ? updatedFile : f));
+
+    // Re-parse the file with the new type
+    const parsedFile = await parseFile(updatedFile);
+    setFiles(prev => prev.map(f => f.id === id ? parsedFile : f));
   }, [files, parseFile]);
 
   const removeFile = useCallback((id: string) => {
@@ -447,6 +506,7 @@ export const FileWorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     isLoading,
     addFiles,
     updateFileContent,
+    updateFileType,
     removeFile,
     renameFile,
     clearAll,
