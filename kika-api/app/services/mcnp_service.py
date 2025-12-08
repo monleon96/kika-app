@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Dict, Any, Tuple, Optional, List
 from fastapi import HTTPException
 
-from kika.input.parse_input import read_mcnp
-from kika.mctal.parse_mctal import read_mctal
+from kika.mcnp.parse_input import read_mcnp
+from kika.mcnp.parse_mctal import read_mctal
 
 # Caches for parsed objects
 MCNP_INPUT_CACHE: Dict[str, Dict[str, Any]] = {}

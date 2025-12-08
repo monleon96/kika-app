@@ -23,6 +23,7 @@ import {
   DesktopWindows,
   Inventory,
   Analytics,
+  ScatterPlot,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useFileWorkspace } from '../contexts/FileWorkspaceContext';
@@ -238,6 +239,14 @@ export const Home: React.FC = () => {
       icon: <Inventory sx={{ fontSize: 28 }} />,
       onClick: () => navigate('/materials'),
       color: theme.palette.success.main,
+    },
+    {
+      title: 'Sampling',
+      description: 'Generate perturbed nuclear data files using covariance matrices for uncertainty quantification. Create HPC-ready scripts or run dry-runs locally.',
+      icon: <ScatterPlot sx={{ fontSize: 28 }} />,
+      onClick: () => navigate('/sampling'),
+      color: '#f59e0b',
+      badge: 'New',
     },
     {
       title: 'NJOY Processing',

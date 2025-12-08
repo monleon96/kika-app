@@ -18,6 +18,7 @@ import { MCNPPage } from './pages/MCNPPage';
 import { Materials } from './pages/Materials';
 import { MaterialDetail } from './pages/MaterialDetail';
 import { MaterialEditor } from './pages/MaterialEditor';
+import { Sampling } from './pages/Sampling';
 import { Settings } from './pages/Settings';
 import { FileManager } from './pages/FileManager';
 import { useAuth } from './contexts/AuthContext';
@@ -69,6 +70,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="materials/create" element={<MaterialEditor />} />
         <Route path="materials/import" element={<MaterialEditor />} />
         <Route path="materials/:materialId" element={<MaterialDetail />} />
+        <Route path="sampling" element={<Sampling />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

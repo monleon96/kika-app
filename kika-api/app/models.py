@@ -315,3 +315,107 @@ class MCTALInfoResponse(BaseModel):
     tally_numbers: List[int]
     npert: int
     tallies_summary: Dict[int, TallySummary]
+
+
+# ============================================================================
+# Sampling Configuration Models
+# ============================================================================
+
+class FileEntryRequest(BaseModel):
+    """File entry for ACE/ENDF files with covariance pair"""
+    id: str
+    data_file_path: str
+    cov_file_path: str = ""
+    zaid: Optional[int] = None
+
+
+class AdvancedOptionsRequest(BaseModel):
+    """Advanced options for covariance matrix fixing"""
+    autofix: str = "none"  # 'none', 'soft', 'medium', 'hard'
+    high_val_thresh: float = 1.0
+    accept_tol: float = -1.0e-4
+    remove_blocks: Optional[Dict[int, List[List[int]]]] = None
+
+
+class SamplingConfigRequest(BaseModel):
+    """Base sampling configuration request"""
+    type: str  # 'ace', 'endf', 'ace-from-endf'
+    num_samples: int = 100
+    mt_list: List[int] = []
+    sampling_method: str = "sobol"  # 'sobol', 'lhs', 'random'
+    decomposition_method: str = "svd"  # 'svd', 'cholesky', 'eigen', 'pca'
+    space: str = "log"  # 'log', 'linear'
+    seed: Optional[int] = 42
+    nprocs: int = 4
+    dry_run: bool = False
+    verbose: bool = True
+    output_dir: str = "."
+    
+    # ACE perturbation specific
+    ace_files: Optional[List[FileEntryRequest]] = None
+    xsdir_file: Optional[str] = None
+    advanced_options: AdvancedOptionsRequest = AdvancedOptionsRequest()
+    
+    # ENDF perturbation specific
+    endf_files: Optional[List[FileEntryRequest]] = None
+    legendre_coeffs: Optional[List[int]] = None
+    generate_ace: bool = False
+    njoy_exe: Optional[str] = None
+    temperatures: Optional[List[float]] = None
+    library_name: Optional[str] = None
+    njoy_version: str = "NJOY 2016.78"
+    
+    # ACE from ENDF specific
+    root_dir: Optional[str] = None
+    zaids: Optional[List[int]] = None
+    cov_files: Optional[List[str]] = None
+
+
+class ACEPerturbationConfigRequest(SamplingConfigRequest):
+    """ACE perturbation configuration request"""
+    type: str = "ace"
+    ace_files: List[FileEntryRequest]
+    xsdir_file: str = ""
+
+
+class ENDFPerturbationConfigRequest(SamplingConfigRequest):
+    """ENDF perturbation configuration request"""
+    type: str = "endf"
+    endf_files: List[FileEntryRequest]
+    legendre_coeffs: List[int] = [1, 2, 3]
+    generate_ace: bool = False
+    njoy_exe: str = ""
+    temperatures: List[float] = [300.0]
+    library_name: str = "endfb81"
+    njoy_version: str = "NJOY 2016.78"
+    xsdir_file: str = ""
+
+
+class ACEFromENDFConfigRequest(SamplingConfigRequest):
+    """ACE from ENDF perturbation configuration request"""
+    type: str = "ace-from-endf"
+    root_dir: str
+    temperatures: List[float]
+    zaids: List[int]
+    cov_files: List[str]
+
+
+class ValidationResult(BaseModel):
+    """Validation result"""
+    valid: bool
+    errors: List[str] = []
+    warnings: List[str] = []
+
+
+class GeneratedScriptResponse(BaseModel):
+    """Response containing generated Python script"""
+    script: str
+    filename: str
+    estimated_runtime: Optional[str] = None
+
+
+class LogEntryResponse(BaseModel):
+    """Log entry for dry run streaming"""
+    timestamp: str
+    level: str  # 'info', 'warning', 'error', 'debug'
+    message: str

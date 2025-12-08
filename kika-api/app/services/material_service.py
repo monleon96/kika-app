@@ -15,8 +15,8 @@ kika_path = Path(__file__).resolve().parents[4] / 'kika'
 if str(kika_path) not in sys.path:
     sys.path.insert(0, str(kika_path))
 
-from kika.input.material import MaterialCollection, Material, Nuclide
-from kika.input.parse_materials import read_material
+from kika.mcnp.material import MaterialCollection, Material, Nuclide
+from kika.mcnp.parse_materials import read_material
 
 
 def parse_mcnp_materials(content: str) -> List[Dict[str, Any]]:
